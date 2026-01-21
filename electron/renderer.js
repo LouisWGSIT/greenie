@@ -88,12 +88,17 @@ loginForm.addEventListener('submit', async (e) => {
         const response = await fetch(`${apiUrl}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
+            timeout: 10000
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            loginError.textContent = error.detail || 'Login failed';
+            try {
+                const error = await response.json();
+                loginError.textContent = error.detail || `Login failed (${response.status})`;
+            } catch {
+                loginError.textContent = `Server error: ${response.status} ${response.statusText}`;
+            }
             loginError.classList.add('visible');
             return;
         }
@@ -111,8 +116,19 @@ loginForm.addEventListener('submit', async (e) => {
         loginError.classList.remove('visible');
         showChatPanel();
     } catch (error) {
-        loginError.textContent = 'Network error. Please try again.';
+        loginError.textContent = `Network error: ${error.message}`;
         loginError.classList.add('visible');
+        
+        // Log to backend for debugging
+        logErrorToBackend({
+            message: `Login network error: ${error.message}`,
+            type: 'login_network_error',
+            details: {
+                errorMessage: error.message,
+                timestamp: new Date().toISOString(),
+                apiUrl: apiUrl
+            }
+        });
     }
 });
 
@@ -127,13 +143,29 @@ registerForm.addEventListener('submit', async (e) => {
         const response = await fetch(`${apiUrl}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, email, password })
+            body: JSON.stringify({ username, email, password }),
+            timeout: 10000
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            registerError.textContent = error.detail || 'Registration failed';
+            try {
+                const error = await response.json();
+                registerError.textContent = error.detail || `Registration failed (${response.status})`;
+            } catch {
+                registerError.textContent = `Server error: ${response.status} ${response.statusText}`;
+            }
             registerError.classList.add('visible');
+            
+            // Log to backend for debugging
+            logErrorToBackend({
+                message: `Registration failed: HTTP ${response.status}`,
+                type: 'registration_error',
+                details: {
+                    statusCode: response.status,
+                    email: email,
+                    timestamp: new Date().toISOString()
+                }
+            });
             return;
         }
         
@@ -143,7 +175,8 @@ registerForm.addEventListener('submit', async (e) => {
         const loginResponse = await fetch(`${apiUrl}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
+            timeout: 10000
         });
         
         if (loginResponse.ok) {
@@ -157,10 +190,24 @@ registerForm.addEventListener('submit', async (e) => {
             }));
             
             showChatPanel();
+        } else {
+            registerError.textContent = `Auto-login failed: ${loginResponse.status}`;
+            registerError.classList.add('visible');
         }
     } catch (error) {
-        registerError.textContent = 'Network error. Please try again.';
+        registerError.textContent = `Network error: ${error.message}`;
         registerError.classList.add('visible');
+        
+        // Log to backend for debugging
+        logErrorToBackend({
+            message: `Registration network error: ${error.message}`,
+            type: 'registration_network_error',
+            details: {
+                errorMessage: error.message,
+                timestamp: new Date().toISOString(),
+                apiUrl: apiUrl
+            }
+        });
     }
 });
 
