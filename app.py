@@ -813,7 +813,8 @@ class UncertaintyLogRequest(BaseModel):
 
 # Groq API configuration (free tier: 30 req/min, 14,400 tokens/min)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-DEFAULT_MODEL = "llama3-70b-8192"  # Options: llama3-70b-8192, llama3-8b-8192, mixtral-8x7b-32768, gemma-7b-it
+# Allow overriding the Groq model; default to a currently available model
+DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama3-8b-8192")  # Options: llama3-8b-8192, mixtral-8x7b-32768, gemma-7b-it
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -1276,7 +1277,7 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
                 # when in test mode, return deterministic fake replies to avoid external dependency
                 reply = f"Test reply: {req.message}"
             else:
-                # Use Groq API instead of Ollama
+                # Use Groq API
                 if not groq_client:
                     logger.error("Groq API key not set. Set GROQ_API_KEY environment variable.")
                     return {"error": "LLM service not configured. Please set GROQ_API_KEY environment variable."}
@@ -1334,7 +1335,7 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
             return {"reply": reply}
         except requests.exceptions.RequestException as e:     # Helpful error message if the local model/API isn't reachable
             logger.error(f"Chat endpoint request error: {e}")
-            return {"error": f"Failed to connect to Ollama API: {str(e)}"}
+            return {"error": f"Failed to connect to Groq API: {str(e)}"}
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
