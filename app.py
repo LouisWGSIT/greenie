@@ -14,7 +14,7 @@ from database import (
 )
 from tools import get_time, get_time_human_short
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
 import os
 import sys
 import subprocess
@@ -234,6 +234,491 @@ async def delete_user(user_id: int, current_user: User = Depends(get_current_use
     db.delete(user)
     db.commit()
     return {"message": f"User {user.username} deleted successfully"}
+
+
+# ===== ERROR LOGGING ENDPOINTS =====
+
+@app.post("/api/log-error")
+async def log_error(
+    error_data: dict,
+    current_user: User = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    """Log an error from the client app"""
+    from database import ErrorLog
+    import json
+    
+    try:
+        log = ErrorLog(
+            user_id=current_user.id if current_user else None,
+            error_message=error_data.get("message", "Unknown error"),
+            error_type=error_data.get("type", "unknown"),
+            error_details=json.dumps(error_data.get("details", {}))
+        )
+        db.add(log)
+        db.commit()
+        return {"status": "logged", "id": log.id}
+    except Exception as e:
+        db.rollback()
+        print(f"Error logging error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.get("/admin/logs")
+async def get_error_logs(
+    limit: int = 100,
+    offset: int = 0,
+    error_type: str = None,
+    user_id: int = None,
+    resolved: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get error logs (admin only)"""
+    from database import ErrorLog
+    
+    query = db.query(ErrorLog)
+    
+    # Filters
+    if error_type:
+        query = query.filter(ErrorLog.error_type == error_type)
+    if user_id:
+        query = query.filter(ErrorLog.user_id == user_id)
+    if resolved:
+        query = query.filter(ErrorLog.resolved == resolved)
+    
+    # Count total
+    total = query.count()
+    
+    # Get paginated results
+    logs = query.order_by(ErrorLog.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "logs": [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "username": log.user.username if log.user else "Anonymous",
+                "error_message": log.error_message,
+                "error_type": log.error_type,
+                "error_details": log.error_details,
+                "resolved": log.resolved,
+                "created_at": log.created_at.isoformat() if log.created_at else None
+            }
+            for log in logs
+        ]
+    }
+
+
+@app.get("/admin/logs/{log_id}")
+async def get_error_log(
+    log_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific error log (admin only)"""
+    from database import ErrorLog
+    
+    log = db.query(ErrorLog).filter(ErrorLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    
+    return {
+        "id": log.id,
+        "user_id": log.user_id,
+        "username": log.user.username if log.user else "Anonymous",
+        "error_message": log.error_message,
+        "error_type": log.error_type,
+        "error_details": log.error_details,
+        "resolved": log.resolved,
+        "created_at": log.created_at.isoformat() if log.created_at else None
+    }
+
+
+@app.patch("/admin/logs/{log_id}")
+async def update_error_log(
+    log_id: int,
+    update_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update error log status (mark as resolved, etc) (admin only)"""
+    from database import ErrorLog
+    
+    log = db.query(ErrorLog).filter(ErrorLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    
+    if "resolved" in update_data:
+        log.resolved = update_data["resolved"]  # "open", "investigating", "resolved"
+    
+    db.commit()
+    return {"status": "updated", "id": log.id}
+
+
+@app.get("/admin/logs/stats/summary")
+async def get_error_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get error statistics (admin only)"""
+    from database import ErrorLog
+    from sqlalchemy import func
+    
+    # Total errors
+    total_errors = db.query(ErrorLog).count()
+    
+    # Errors by type
+    errors_by_type = db.query(
+        ErrorLog.error_type,
+        func.count(ErrorLog.id).label("count")
+    ).group_by(ErrorLog.error_type).all()
+    
+    # Open errors
+    open_errors = db.query(ErrorLog).filter(ErrorLog.resolved == "open").count()
+    
+    # Errors in last 24 hours
+    from datetime import timedelta
+    twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+    recent_errors = db.query(ErrorLog).filter(
+        ErrorLog.created_at >= twenty_four_hours_ago
+    ).count()
+    
+    # Most active error user
+    most_active = db.query(
+        ErrorLog.user_id,
+        User.username,
+        func.count(ErrorLog.id).label("count")
+    ).join(User).group_by(ErrorLog.user_id, User.username).order_by(
+        func.count(ErrorLog.id).desc()
+    ).first()
+    
+    return {
+        "total_errors": total_errors,
+        "open_errors": open_errors,
+        "recent_errors_24h": recent_errors,
+        "errors_by_type": {et[0]: et[1] for et in errors_by_type},
+        "most_active_error_user": {
+            "user_id": most_active[0],
+            "username": most_active[1],
+            "error_count": most_active[2]
+        } if most_active else None
+    }
+
+
+@app.get("/admin")
+async def admin_dashboard(current_user: User = Depends(get_current_user)):
+    """Admin dashboard for error logs and monitoring (admin only)"""
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Greenie Admin Dashboard</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                color: #e0e0e0;
+                min-height: 100vh;
+                padding: 20px;
+            }
+            
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+            
+            h1 {
+                color: #00ff00;
+                margin-bottom: 30px;
+                text-align: center;
+                font-size: 2.5em;
+                text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            }
+            
+            .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+                margin-bottom: 40px;
+            }
+            
+            .stat-card {
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(0, 255, 0, 0.3);
+                border-radius: 10px;
+                padding: 20px;
+                text-align: center;
+            }
+            
+            .stat-card h3 {
+                color: #00ff00;
+                font-size: 0.9em;
+                margin-bottom: 10px;
+                text-transform: uppercase;
+            }
+            
+            .stat-card .value {
+                font-size: 2.5em;
+                color: #00ff00;
+                font-weight: bold;
+            }
+            
+            .logs-section {
+                background: rgba(0, 0, 0, 0.3);
+                border: 2px solid rgba(0, 255, 0, 0.3);
+                border-radius: 10px;
+                padding: 20px;
+            }
+            
+            .logs-section h2 {
+                color: #00ff00;
+                margin-bottom: 20px;
+                border-bottom: 2px solid rgba(0, 255, 0, 0.3);
+                padding-bottom: 10px;
+            }
+            
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            
+            thead {
+                background: rgba(0, 255, 0, 0.1);
+            }
+            
+            th, td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+            }
+            
+            th {
+                color: #00ff00;
+                font-weight: bold;
+                text-transform: uppercase;
+                font-size: 0.85em;
+            }
+            
+            tr:hover {
+                background: rgba(0, 255, 0, 0.05);
+            }
+            
+            .error-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 0.8em;
+                font-weight: bold;
+            }
+            
+            .error-badge.network {
+                background: rgba(255, 100, 100, 0.3);
+                color: #ff6464;
+            }
+            
+            .error-badge.timeout {
+                background: rgba(255, 150, 0, 0.3);
+                color: #ff9600;
+            }
+            
+            .error-badge.auth {
+                background: rgba(100, 100, 255, 0.3);
+                color: #6464ff;
+            }
+            
+            .error-badge.chat {
+                background: rgba(255, 100, 200, 0.3);
+                color: #ff64c8;
+            }
+            
+            .status-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 0.8em;
+                font-weight: bold;
+            }
+            
+            .status-badge.open {
+                background: rgba(255, 100, 100, 0.3);
+                color: #ff6464;
+            }
+            
+            .status-badge.investigating {
+                background: rgba(255, 150, 0, 0.3);
+                color: #ff9600;
+            }
+            
+            .status-badge.resolved {
+                background: rgba(0, 255, 100, 0.3);
+                color: #00ff64;
+            }
+            
+            .loading {
+                text-align: center;
+                color: #00ff00;
+                padding: 40px;
+            }
+            
+            .spinner {
+                border: 3px solid rgba(0, 255, 0, 0.2);
+                border-top: 3px solid #00ff00;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .refresh-btn {
+                background: rgba(0, 255, 0, 0.2);
+                border: 2px solid #00ff00;
+                color: #00ff00;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-weight: bold;
+                float: right;
+                margin-bottom: 20px;
+            }
+            
+            .refresh-btn:hover {
+                background: rgba(0, 255, 0, 0.3);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🟢 Greenie Admin Dashboard</h1>
+            
+            <button class="refresh-btn" onclick="loadStats()">🔄 Refresh</button>
+            <div style="clear: both;"></div>
+            
+            <div class="stats-grid" id="statsGrid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading statistics...
+                </div>
+            </div>
+            
+            <div class="logs-section">
+                <h2>Recent Error Logs</h2>
+                <div id="logsContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading logs...
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            async function loadStats() {
+                try {
+                    const response = await fetch('/admin/logs/stats/summary');
+                    const data = await response.json();
+                    
+                    const statsHtml = `
+                        <div class="stat-card">
+                            <h3>Total Errors</h3>
+                            <div class="value">${data.total_errors}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Open Errors</h3>
+                            <div class="value">${data.open_errors}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Errors (24h)</h3>
+                            <div class="value">${data.recent_errors_24h}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Error Types</h3>
+                            <div class="value">${Object.keys(data.errors_by_type).length}</div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('statsGrid').innerHTML = statsHtml;
+                } catch (error) {
+                    console.error('Failed to load stats:', error);
+                    document.getElementById('statsGrid').innerHTML = '<p>Failed to load statistics</p>';
+                }
+            }
+            
+            async function loadLogs() {
+                try {
+                    const response = await fetch('/admin/logs?limit=50');
+                    const data = await response.json();
+                    
+                    if (data.logs.length === 0) {
+                        document.getElementById('logsContent').innerHTML = '<p>No errors logged yet. Great job! 🎉</p>';
+                        return;
+                    }
+                    
+                    const logsHtml = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Error Type</th>
+                                    <th>Message</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.logs.map(log => `
+                                    <tr>
+                                        <td>${new Date(log.created_at).toLocaleString()}</td>
+                                        <td>${log.username}</td>
+                                        <td><span class="error-badge ${log.error_type.split('_')[0]}">${log.error_type}</span></td>
+                                        <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">${log.error_message}</td>
+                                        <td><span class="status-badge ${log.resolved}">${log.resolved}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('logsContent').innerHTML = logsHtml;
+                } catch (error) {
+                    console.error('Failed to load logs:', error);
+                    document.getElementById('logsContent').innerHTML = '<p>Failed to load logs</p>';
+                }
+            }
+            
+            // Load data on page load
+            window.addEventListener('load', () => {
+                loadStats();
+                loadLogs();
+                
+                // Refresh every 30 seconds
+                setInterval(() => {
+                    loadStats();
+                    loadLogs();
+                }, 30000);
+            });
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 
 # ===== MEMORY & KNOWLEDGE ENDPOINTS =====

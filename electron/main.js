@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 let tray = null;
@@ -7,6 +8,9 @@ let isQuitting = false;
 
 // API URL - change this after deploying
 const API_URL = 'https://greenie-t89u.onrender.com';
+
+// Configure auto-updater
+autoUpdater.checkForUpdatesAndNotify();
 
 function createWindow() {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -80,6 +84,13 @@ function createTray() {
         },
         { type: 'separator' },
         {
+            label: 'Check for Updates',
+            click: () => {
+                autoUpdater.checkForUpdates();
+            }
+        },
+        { type: 'separator' },
+        {
             label: 'Settings',
             click: () => {
                 // Future: Open settings window
@@ -113,6 +124,11 @@ app.whenReady().then(() => {
     createWindow();
     createTray();
     
+    // Check for updates every hour
+    setInterval(() => {
+        autoUpdater.checkForUpdates();
+    }, 60 * 60 * 1000);
+    
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
@@ -125,6 +141,23 @@ app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+// Auto-updater events
+autoUpdater.on('update-available', () => {
+    console.log('Update available');
+    mainWindow.webContents.send('update-available');
+});
+
+autoUpdater.on('update-not-available', () => {
+    console.log('No updates available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+    console.log('Update downloaded, will install on quit');
+    mainWindow.webContents.send('update-downloaded');
+    // Auto-install on quit
+    autoUpdater.quitAndInstall();
 });
 
 // IPC handlers for communication with renderer
@@ -140,3 +173,11 @@ ipcMain.handle('quit-app', () => {
     isQuitting = true;
     app.quit();
 });
+
+ipcMain.handle('check-for-updates', async () => {
+    const result = await autoUpdater.checkForUpdates();
+    return {
+        updateAvailable: result.updateInfo.version !== app.getVersion(),
+        currentVersion: app.getVersion(),
+        availableVersion: result.updateInfo.version
+    };

@@ -294,8 +294,36 @@ async function sendMessage() {
         if (thinkingMsg) {
             thinkingMsg.remove();
         }
+        
+        // Log error to backend
+        const errorType = error.message.includes('Cannot reach') ? 'network_error' : 'chat_error';
+        logErrorToBackend({
+            message: error.message || 'Unknown error',
+            type: errorType,
+            details: {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent
+            }
+        });
+        
         const errorMsg = error.message || 'Unknown error occurred';
         addMessage('Greenie', `❌ Error: ${errorMsg}`, 'error');
+    }
+}
+
+// Log errors to backend for monitoring
+async function logErrorToBackend(errorData) {
+    try {
+        await fetch(`${apiUrl}/api/log-error`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentToken && { 'Authorization': `Bearer ${currentToken}` })
+            },
+            body: JSON.stringify(errorData)
+        });
+    } catch (e) {
+        console.log('Could not send error log to backend');
     }
 }
 

@@ -44,6 +44,7 @@ class User(Base):
     memories = relationship("Memory", back_populates="user", cascade="all, delete-orphan")
     knowledge = relationship("Knowledge", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    error_logs = relationship("ErrorLog", back_populates="user", cascade="all, delete-orphan")
 
 
 class Memory(Base):
@@ -102,6 +103,28 @@ class Session(Base):
     # Unique constraint: one session per user per session_id
     __table_args__ = (
         Index('idx_user_session', 'user_id', 'session_id', unique=True),
+    )
+
+
+class ErrorLog(Base):
+    """Error logs for debugging and monitoring"""
+    __tablename__ = "error_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # Optional if not logged in
+    error_message = Column(Text, nullable=False)
+    error_type = Column(String(100), nullable=False)  # "chat_error", "auth_error", "network_error", etc
+    error_details = Column(Text)  # JSON string with additional details
+    resolved = Column(String(50), default="open")  # "open", "investigating", "resolved"
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationship
+    user = relationship("User", back_populates="error_logs")
+    
+    # Index for fast queries
+    __table_args__ = (
+        Index('idx_created_at', 'created_at'),
+        Index('idx_user_created', 'user_id', 'created_at'),
     )
 
 

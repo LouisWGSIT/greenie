@@ -4,5 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
     getApiUrl: () => ipcRenderer.invoke('get-api-url'),
     minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
-    quitApp: () => ipcRenderer.invoke('quit-app')
-});
+    quitApp: () => ipcRenderer.invoke('quit-app'),
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    onUpdateAvailable: (callback) => ipcRenderer.on('update-available', callback),
+    onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback)
