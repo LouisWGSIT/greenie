@@ -160,6 +160,15 @@ async def health():
 @app.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """Register a new user"""
+    # Validate email domain
+    try:
+        user_data.validate_email_domain()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
     user = create_user(db, user_data.username, user_data.email, user_data.password)
     return user
 
@@ -183,6 +192,48 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user info"""
     return current_user
+
+
+# ===== ADMIN ENDPOINTS =====
+
+@app.get("/admin/users")
+async def list_users(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List all users (admin only)"""
+    # Get all users
+    users = db.query(User).all()
+    return {
+        "users": [
+            {
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "created_at": u.created_at.isoformat() if u.created_at else None
+            }
+            for u in users
+        ]
+    }
+
+
+@app.delete("/admin/users/{user_id}")
+async def delete_user(user_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Delete a user (admin only)"""
+    # Prevent self-deletion
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    db.delete(user)
+    db.commit()
+    return {"message": f"User {user.username} deleted successfully"}
 
 
 # ===== MEMORY & KNOWLEDGE ENDPOINTS =====

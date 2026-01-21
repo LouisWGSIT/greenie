@@ -31,6 +31,13 @@ class UserRegister(BaseModel):
     username: str
     email: str
     password: str
+    
+    def validate_email_domain(self):
+        """Validate that email is from allowed domain"""
+        allowed_domain = "greensafeit.com"
+        if not self.email.lower().endswith(f"@{allowed_domain}"):
+            raise ValueError(f"Only {allowed_domain} emails are allowed")
+        return self
 
 
 class UserLogin(BaseModel):
