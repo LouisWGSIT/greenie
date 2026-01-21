@@ -1,0 +1,137 @@
+{
+  "warehouse_overview": {
+    "name": "Berry Hill ITAD Warehouse",
+    "location": "Droitwich",
+    "mission": "Erase, diagnose, grade, and refurbish IT equipment received from customers"
+  },
+  "workflow": [
+    {
+      "name": "IA (Inventory Administration) Team",
+      "description": "Starting point in warehouse workflow. Books in all incoming equipment.",
+      "keywords": ["intake", "booking", "receiving", "RFID", "tagging"],
+      "details": {
+        "scope": "Books in all data-bearing and non-data-bearing equipment",
+        "equipment_types": [
+          "Laptops",
+          "Desktops",
+          "Mobiles",
+          "Tablets",
+          "Apple devices",
+          "Servers",
+          "Switches",
+          "Misc networking equipment",
+          "SIM cards",
+          "USB drives"
+        ],
+        "process": [
+          "Open totes/boxes from customer shipments",
+          "Take pictures of contents",
+          "Separate data-bearing devices from non-data-bearing items",
+          "Separate cables, cardboard, and other rubbish",
+          "Tag data-bearing devices with RFID containing unique stock ID and device serial number",
+          "Label non-data-bearing tracked items (e.g., ID cards) with regular labels",
+          "Send tagged devices down the roller to engineers"
+        ]
+      }
+    },
+    {
+      "name": "Engineering Team",
+      "description": "Erases and diagnoses devices received from IA team.",
+      "keywords": ["erase", "diagnose", "wipe", "testing"],
+      "details": {
+        "scope": "Data erasure and hardware diagnostics",
+        "process": [
+          "Receive devices from IA via roller",
+          "Perform data erasure procedures (varies by device type)",
+          "Run hardware diagnostics",
+          "Document findings",
+          "Pass devices to QA team for grading"
+        ],
+        "erasure_procedures": {
+          "note": "Add specific erasure procedures by device type here as you detail them",
+          "pending": true
+        }
+      }
+    },
+    {
+      "name": "QA (Quality Assurance) Team",
+      "description": "Grades devices and assigns final destination.",
+      "keywords": ["grade", "quality", "destination", "assessment"],
+      "details": {
+        "scope": "Inspect, grade, and assign device destinations",
+        "grading_criteria": {
+          "note": "Add specific grading criteria and destination rules here as you detail them",
+          "pending": true
+        },
+        "destinations": [
+          {
+            "name": "Resale",
+            "description": "Device meets quality standards for retail resale"
+          },
+          {
+            "name": "Disposal",
+            "description": "Device cannot be salvaged or repaired"
+          },
+          {
+            "name": "Breakfix",
+            "description": "Device requires repair before resale"
+          },
+          {
+            "name": "Refurbish",
+            "description": "Device needs cosmetic or functional refurbishment"
+          },
+          {
+            "name": "Quarantine",
+            "description": "Device flagged for investigation (e.g., failed erase, security concern)",
+            "rules": {
+              "note": "Add quarantine rules and triggers here as you detail them",
+              "pending": true
+            }
+          },
+          {
+            "name": "Used Approved",
+            "description": "Device approved for as-is sale as used equipment"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Sorting Team",
+      "description": "Packs devices onto trolleys and pallets for final destinations.",
+      "keywords": ["sort", "pack", "trolley", "pallet", "shipping"],
+      "details": {
+        "scope": "Route devices to final destinations",
+        "process": [
+          "Receive QA-graded devices with destination assignments",
+          "Assign device to appropriate trolley or pallet based on destination",
+          "Prepare for shipping/internal movement to destination warehouse"
+        ]
+      }
+    }
+  ],
+  "device_categories": {
+    "note": "Add specific handling, erasure, and diagnostic procedures by device category as you detail them",
+    "pending": true,
+    "examples": [
+      {
+        "category": "Laptops",
+        "erasure_method": "pending",
+        "diagnostic_tests": "pending"
+      },
+      {
+        "category": "Servers",
+        "erasure_method": "pending",
+        "diagnostic_tests": "pending"
+      },
+      {
+        "category": "Mobile Devices",
+        "erasure_method": "pending",
+        "diagnostic_tests": "pending"
+      }
+    ]
+  },
+  "common_issues": {
+    "note": "Add common issues, troubleshooting steps, and escalation procedures as you encounter them",
+    "pending": true
+  }
+}

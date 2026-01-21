@@ -40,8 +40,64 @@ from sqlalchemy.orm import Session
 # Initialize database on startup
 init_db()
 
+# Load knowledge seed on startup
+def load_knowledge_seed():
+    """Load warehouse knowledge from seed file on app startup."""
+    seed_path = os.path.join(os.path.dirname(__file__), 'knowledge_seed.json')
+    if not os.path.exists(seed_path):
+        return
+    
+    try:
+        import json
+        with open(seed_path, 'r', encoding='utf-8') as f:
+            seed_data = json.load(f)
+        
+        # Create knowledge store for default user (ID=1)
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            knowledge_store = KnowledgeStore(user_id=1)
+            
+            # Load workflow items
+            if 'workflow' in seed_data:
+                for item in seed_data['workflow']:
+                    try:
+                        knowledge_store.add_knowledge(
+                            name=item.get('name', ''),
+                            description=item.get('description', ''),
+                            keywords=item.get('keywords', [])
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to load workflow item {item.get('name')}: {e}")
+            
+            # Load device categories
+            if 'device_categories' in seed_data:
+                cats = seed_data['device_categories']
+                if isinstance(cats.get('examples'), list):
+                    for item in cats['examples']:
+                        try:
+                            knowledge_store.add_knowledge(
+                                name=f"Device: {item.get('category', '')}",
+                                description=f"Device category with erasure and diagnostic procedures. Erasure: {item.get('erasure_method', 'pending')}. Diagnostics: {item.get('diagnostic_tests', 'pending')}",
+                                keywords=["device", "category", item.get('category', '').lower()]
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to load device category {item.get('category')}: {e}")
+            
+            logger.info("Knowledge seed loaded successfully")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to load knowledge seed: {e}")
+
 
 app = FastAPI()
+
+# Load knowledge seed on app startup event
+@app.on_event("startup")
+async def startup_event():
+    """Load warehouse knowledge on startup."""
+    load_knowledge_seed()
 
 # Enable CORS for the popup UI to work from any origin
 from fastapi.middleware.cors import CORSMiddleware
@@ -907,6 +963,64 @@ async def list_knowledge(current_user: User | None = Depends(get_current_user_op
     user_id = current_user.id if current_user else 1
     user_knowledge = KnowledgeStore(user_id=user_id)
     return {"results": user_knowledge.list_all()}
+
+@app.get("/knowledge/export")
+async def export_knowledge(current_user: User | None = Depends(get_current_user_optional)):
+    """Export all knowledge and memories as JSON for backup/import."""
+    user_id = current_user.id if current_user else 1
+    user_memory = Memory(user_id=user_id)
+    user_knowledge = KnowledgeStore(user_id=user_id)
+    
+    try:
+        memories = user_memory.get_recent(1000)  # Get all memories
+        knowledge = user_knowledge.list_all()
+        
+        export_data = {
+            "export_date": time.time(),
+            "user_id": user_id,
+            "memories": memories,
+            "knowledge": knowledge
+        }
+        return export_data
+    except Exception as e:
+        return {"error": f"Export failed: {str(e)}"}
+
+@app.post("/knowledge/import")
+async def import_knowledge(data: dict, current_user: User | None = Depends(get_current_user_optional)):
+    """Import knowledge and memories from exported backup."""
+    user_id = current_user.id if current_user else 1
+    user_memory = Memory(user_id=user_id)
+    user_knowledge = KnowledgeStore(user_id=user_id)
+    
+    try:
+        imported_count = {"memories": 0, "knowledge": 0}
+        
+        # Import memories
+        if "memories" in data and isinstance(data["memories"], list):
+            for mem in data["memories"]:
+                try:
+                    user_memory.add_memory(mem)
+                    imported_count["memories"] += 1
+                except Exception as e:
+                    logger.warning(f"Failed to import memory: {e}")
+        
+        # Import knowledge
+        if "knowledge" in data and isinstance(data["knowledge"], list):
+            for item in data["knowledge"]:
+                try:
+                    user_knowledge.add_knowledge(
+                        name=item.get("name", ""),
+                        description=item.get("description", ""),
+                        keywords=item.get("keywords", [])
+                    )
+                    imported_count["knowledge"] += 1
+                except Exception as e:
+                    logger.warning(f"Failed to import knowledge item: {e}")
+        
+        return {"ok": True, "imported": imported_count}
+    except Exception as e:
+        logger.exception(f"Import failed: {e}")
+        return {"error": f"Import failed: {str(e)}"}
 
 @app.post("/tools/summarize")
 async def summarize(req: SummarizeRequest):
