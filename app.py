@@ -1,6 +1,6 @@
 
 # app.py (Multi-user version with Groq API, Database, and Authentication)
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 import requests
 
@@ -95,7 +95,6 @@ import logging
 logging.basicConfig(level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), 'greenie.log'), filemode='a', format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger('greenie')
 
-from fastapi import Request
 from fastapi.responses import JSONResponse
 
 @app.exception_handler(Exception)
@@ -892,8 +891,6 @@ async def debug_version():
     except Exception:
         return {"version": None}
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
 
 # Optional shutdown hook that can be registered by an in-process runner
 shutdown_hook = None
