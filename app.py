@@ -410,8 +410,8 @@ async def get_error_stats(
 
 
 @app.get("/admin")
-async def admin_dashboard(current_user: User = Depends(get_current_user)):
-    """Admin dashboard for error logs and monitoring (admin only)"""
+async def admin_dashboard():
+    """Admin dashboard for error logs and monitoring (public access for team)"""
     html_content = """
     <!DOCTYPE html>
     <html lang="en">
