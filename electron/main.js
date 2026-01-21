@@ -48,10 +48,11 @@ function createWindow() {
 
 function createTray() {
     try {
-    // Load tray icon - use .ico for Windows, .png for cross-platform
-    const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
-    const icon = nativeImage.createFromPath(iconPath);
-    tray = new Tray(icon);
+        // Load Windows ICO for crisp tray icon
+        const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+        const icon = nativeImage.createFromPath(iconPath);
+        icon.setTemplateImage(false);
+        tray = new Tray(icon);
     } catch (err) {
         console.warn('Could not load tray icon:', err.message);
         // Final fallback - create simple nativeImage

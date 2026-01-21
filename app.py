@@ -271,10 +271,9 @@ async def get_error_logs(
     error_type: str = None,
     user_id: int = None,
     resolved: str = None,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get error logs (admin only)"""
+    """Get error logs (public for monitoring)"""
     from database import ErrorLog
     
     query = db.query(ErrorLog)
@@ -316,10 +315,9 @@ async def get_error_logs(
 @app.get("/admin/logs/{log_id}")
 async def get_error_log(
     log_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific error log (admin only)"""
+    """Get a specific error log (public for monitoring)"""
     from database import ErrorLog
     
     log = db.query(ErrorLog).filter(ErrorLog.id == log_id).first()
@@ -361,10 +359,9 @@ async def update_error_log(
 
 @app.get("/admin/logs/stats/summary")
 async def get_error_stats(
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get error statistics (admin only)"""
+    """Get error statistics (public for monitoring)"""
     from database import ErrorLog
     from sqlalchemy import func
     
@@ -381,7 +378,7 @@ async def get_error_stats(
     open_errors = db.query(ErrorLog).filter(ErrorLog.resolved == "open").count()
     
     # Errors in last 24 hours
-    from datetime import timedelta
+    from datetime import datetime, timedelta
     twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
     recent_errors = db.query(ErrorLog).filter(
         ErrorLog.created_at >= twenty_four_hours_ago
