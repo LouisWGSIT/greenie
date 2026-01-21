@@ -37,7 +37,14 @@ const registerError = document.getElementById('registerError');
     try {
         const healthResponse = await fetch(`${apiUrl}/health`, { timeout: 3000 });
         if (healthResponse.ok) {
+            const health = await healthResponse.json();
             console.log('[Greenie] Backend is reachable');
+            console.log('[Greenie] Security status:', health.security);
+            
+            // Check if network-only mode is enabled and we're not on private network
+            if (health.security?.network_only_mode && !health.security?.is_private_network) {
+                console.warn('[Greenie] WARNING: Server is in network-only mode and you are NOT on the private network');
+            }
         } else {
             console.warn('[Greenie] Backend returned:', healthResponse.status);
         }
@@ -405,7 +412,10 @@ async function sendMessage() {
             thinkingMsg.remove();
         }
         
-        addMessage('Greenie', data.response, 'assistant');
+        // Backend returns "reply", not "response"
+        const reply = data.reply || data.response || data.message || 'No response';
+        console.log('[Greenie Chat] Response received:', reply.substring(0, 100));
+        addMessage('Greenie', reply, 'assistant');
     } catch (error) {
         const thinkingMsg = messages.querySelector('.thinking');
         if (thinkingMsg) {

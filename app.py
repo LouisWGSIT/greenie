@@ -53,6 +53,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===== SECURITY: Network-Only Mode =====
+NETWORK_ONLY_MODE = os.getenv('GREENIE_NETWORK_ONLY', 'false').lower() == 'true'
+ALLOWED_EXTERNAL_APIS = {
+    'api.groq.com',  # Groq API (LLM)
+}
+
+def is_private_ip(ip_str: str) -> bool:
+    """Check if IP is on private/internal network"""
+    try:
+        import ipaddress
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except:
+        return False
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP from request, handling proxies"""
+    if request.client:
+        return request.client.host
+    return '0.0.0.0'
+
+@app.middleware("http")
+async def network_security_middleware(request: Request, call_next):
+    """Enforce network-only mode if enabled"""
+    if NETWORK_ONLY_MODE:
+        client_ip = get_client_ip(request)
+        
+        # Allow localhost and private IPs
+        if not is_private_ip(client_ip):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "Network-only mode: Access restricted to internal network"}
+            )
+    
+    response = await call_next(request)
+    return response
+
 # basic logging
 import logging
 logging.basicConfig(level=logging.INFO, filename=os.path.join(os.path.dirname(__file__), 'greenie.log'), filemode='a', format='%(asctime)s %(levelname)s %(message)s')
@@ -128,12 +165,20 @@ async def chat_popup():
     return JSONResponse(status_code=404, content={"error": "Chat UI not found"})
 
 @app.get("/health")
-async def health():
-    """Health check endpoint with Groq API status."""
+async def health(request: Request):
+    """Health check endpoint with Groq API status and security info."""
+    client_ip = get_client_ip(request)
+    is_private = is_private_ip(client_ip)
+    
     status = {
         "ok": True,
         "groq_configured": bool(GROQ_API_KEY),
-        "model": DEFAULT_MODEL
+        "model": DEFAULT_MODEL,
+        "security": {
+            "network_only_mode": NETWORK_ONLY_MODE,
+            "client_ip": client_ip,
+            "is_private_network": is_private
+        }
     }
     
     # Just report configuration status, don't test API on every health check
@@ -144,6 +189,20 @@ async def health():
         status["groq_status"] = "not_configured"
     
     return status
+
+@app.get("/security/status")
+async def security_status(request: Request):
+    """Get current security status and restrictions"""
+    client_ip = get_client_ip(request)
+    is_private = is_private_ip(client_ip)
+    
+    return {
+        "network_only_mode": NETWORK_ONLY_MODE,
+        "client_ip": client_ip,
+        "is_private_network": is_private,
+        "access_allowed": not NETWORK_ONLY_MODE or is_private,
+        "allowed_external_apis": list(ALLOWED_EXTERNAL_APIS)
+    }
 
 
 # ===== AUTHENTICATION ENDPOINTS =====
