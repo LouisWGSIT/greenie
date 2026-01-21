@@ -46,11 +46,7 @@
           "Run hardware diagnostics",
           "Document findings",
           "Pass devices to QA team for grading"
-        ],
-        "erasure_procedures": {
-          "note": "Add specific erasure procedures by device type here as you detail them",
-          "pending": true
-        }
+        ]
       }
     },
     {
@@ -59,10 +55,6 @@
       "keywords": ["grade", "quality", "destination", "assessment"],
       "details": {
         "scope": "Inspect, grade, and assign device destinations",
-        "grading_criteria": {
-          "note": "Add specific grading criteria and destination rules here as you detail them",
-          "pending": true
-        },
         "destinations": [
           {
             "name": "Resale",
@@ -82,11 +74,7 @@
           },
           {
             "name": "Quarantine",
-            "description": "Device flagged for investigation (e.g., failed erase, security concern)",
-            "rules": {
-              "note": "Add quarantine rules and triggers here as you detail them",
-              "pending": true
-            }
+            "description": "Device flagged for investigation (e.g., failed erase, security concern)"
           },
           {
             "name": "Used Approved",
@@ -109,29 +97,199 @@
       }
     }
   ],
-  "device_categories": {
-    "note": "Add specific handling, erasure, and diagnostic procedures by device category as you detail them",
-    "pending": true,
-    "examples": [
-      {
-        "category": "Laptops",
-        "erasure_method": "pending",
-        "diagnostic_tests": "pending"
-      },
-      {
-        "category": "Servers",
-        "erasure_method": "pending",
-        "diagnostic_tests": "pending"
-      },
-      {
-        "category": "Mobile Devices",
-        "erasure_method": "pending",
-        "diagnostic_tests": "pending"
-      }
-    ]
+  "erasure_procedures": {
+    "laptop_desktop": {
+      "name": "Laptops/Desktops",
+      "method": "BIOS Password Removal + Blancco Erasure",
+      "process": [
+        "1. Load BIOS, remove password (ask QA team or check password cheat sheet if needed)",
+        "2. Turn off Secure Boot",
+        "3. Turn off Virtualization",
+        "4. Clear security chip",
+        "5. Save BIOS changes",
+        "6. Boot from USB or network to load Blancco",
+        "7. Blancco begins erasure while user performs diagnostics",
+        "8. Autopilot check runs simultaneously",
+        "9. Fill in report details",
+        "10. Verify erasure completion and autopilot status updated",
+        "11. Send report to QA"
+      ],
+      "diagnostics": "Yes - performed during Blancco erasure",
+      "keywords": ["bios", "password", "secure-boot", "virtualization", "blancco", "autopilot", "laptop", "desktop"]
+    },
+    "servers": {
+      "name": "Servers",
+      "method": "Blancco Direct (No Diagnostics)",
+      "process": [
+        "1. Load straight into Blancco (no diagnostics or autopilot check)",
+        "2. Erasure procedure only",
+        "3. Fill in mandatory report details: Lot/Sales Order Number, Asset/Stock ID, Engineer initials",
+        "4. Send report",
+        "5. After report: check server for asset tags or company names",
+        "6. Perform factory reset"
+      ],
+      "diagnostics": "No",
+      "mandatory_fields": ["Lot/Sales Order Number", "Asset/Stock ID", "Engineer initials"],
+      "keywords": ["blancco", "factory-reset", "asset-tag", "server"]
+    },
+    "networking": {
+      "name": "Networking Equipment",
+      "method": "Novafox Hydra or Manual Factory Reset",
+      "process": [
+        "1. For most items: use Novafox Hydra to perform factory reset (generates report)",
+        "2. Alternative: user manually performs factory reset if Novafox not available",
+        "3. Reference folder of networking reset procedures available for specific device models"
+      ],
+      "diagnostics": "Novafox Hydra provides report",
+      "keywords": ["novafox-hydra", "factory-reset", "networking", "switches"]
+    },
+    "mobiles_tablets": {
+      "name": "Mobiles/Tablets",
+      "method": "Blancco Standalone (Offline)",
+      "process": [
+        "1. Blancco set up on standalone machines (not connected to online workflow)",
+        "2. Put device into Developer Mode",
+        "3. Blancco prompts for user details",
+        "4. Erasure performed",
+        "5. Factory reset executed",
+        "6. New OS installed",
+        "7. Device shows setup screen (unless remotely managed)"
+      ],
+      "diagnostics": "Yes - during erasure",
+      "keywords": ["dev-mode", "blancco-standalone", "factory-reset", "os-install", "mobile", "tablet"]
+    },
+    "macs": {
+      "name": "Macs",
+      "method": "BEAD Agent (DFU Mode) + Standalone Blancco",
+      "requirements": "M2 Mac or newer",
+      "process": [
+        "1. Mac must be M2 or better",
+        "2. BEAD agent puts Mac into DFU mode",
+        "3. Erasure performed in DFU mode",
+        "4. Once erasure complete, diagnostics run by accessing Setup Screen location",
+        "5. Open terminal: Option + Command + T",
+        "6. Use BEAD-associated USB to load diagnostics",
+        "7. Complete diagnostics and send report"
+      ],
+      "diagnostics": "Yes - via terminal and BEAD USB",
+      "keywords": ["bead-agent", "dfu-mode", "m2", "terminal", "usb-diagnostics", "mac", "apple"]
+    },
+    "surfaces": {
+      "name": "Surfaces",
+      "method": "Laptop/Desktop Procedure (with optional docking)",
+      "process": [
+        "1. Follow Laptop/Desktop procedure",
+        "2. May require docking station to run procedure more easily",
+        "3. Otherwise same as Laptop/Desktop: BIOS password removal, boot Blancco, erasure + diagnostics + autopilot check"
+      ],
+      "diagnostics": "Yes - during Blancco erasure",
+      "keywords": ["dock", "bios", "blancco", "autopilot", "surface"]
+    },
+    "chromebooks": {
+      "name": "Chromebooks",
+      "method": "Powerwash / Dev Mode + Remote Blancco Desktop",
+      "complexity": "High - many staff struggle with this",
+      "process": [
+        "METHOD 1 - Powerwash (if device allows):",
+        "  a. Boot chromebook",
+        "  b. Ctrl + Alt + Shift + R to open Powerwash prompt",
+        "  c. Connect to network",
+        "  d. Check if device is remotely managed",
+        "",
+        "METHOD 2 - Recovery Mode to Dev Mode (if Powerwash unavailable):",
+        "  a. Turn off device",
+        "  b. Hold Power + Esc + Refresh to enter Recovery",
+        "  c. Press Ctrl + D",
+        "  d. Press Enter",
+        "  e. Try Ctrl + D again to enter Dev Mode",
+        "  f. If remotely managed: won't enter Dev Mode, just press Enter to return to normal",
+        "  g. If Dev Mode successful: takes ~5 mins to transition",
+        "",
+        "METHOD 3 - Remote Erasure (if Dev Mode gained):",
+        "  a. Connect to WiFi or Ethernet after Dev Mode boots",
+        "  b. Go to Guest Mode (opens web page)",
+        "  c. Find desktop to connect to",
+        "  d. Input IP address of Blancco-loaded desktop",
+        "  e. Follow on-screen instructions for erasure and diagnostics",
+        "  f. Input engineer details on desktop",
+        "  g. Send report"
+      ],
+      "diagnostics": "Yes - via remote desktop connection",
+      "note": "Louis is experienced with chromebook procedures - consult if stuck",
+      "keywords": ["powerwash", "dev-mode", "recovery", "remote-managed", "guest-mode", "remote-desktop", "chromebook", "ctrl-alt-shift-r"]
+    }
+  },
+  "qa_grading": {
+    "description": "QA (Quality Assurance) grading system and process",
+    "grading_scale": "A, B, C, D (D usually means disposal)",
+    "process": [
+      "1. Engineers use QA app tags that score device and generate grade",
+      "2. Any faults during procedure listed in engineer report",
+      "3. QA person reviews report and inspects physical device for damage",
+      "4. QA takes pictures if required for documentation",
+      "5. Based on engineer report and physical inspection, QA assigns destination:",
+      "   - Resale: meets quality standards for retail resale",
+      "   - Disposal: cannot be salvaged or repaired (usually Grade D)",
+      "   - Breakfix: requires repair before resale",
+      "   - Refurbish: needs cosmetic or functional refurbishment",
+      "   - Quarantine: flagged for further investigation",
+      "   - Used Approved: approved for as-is sale"
+    ],
+    "keywords": ["grade", "qa-tags", "damage-assessment", "destination", "quality"]
+  },
+  "quarantine_rules": {
+    "description": "When and why devices go to quarantine",
+    "primary_reason": "Device locked and unable to be erased",
+    "triggers": [
+      "Macs: multiple lock mechanisms (firmware lock, login password, T2/M-series lockdown)",
+      "Chromebooks: remote management lock, developer mode restrictions, firmware lock",
+      "Phones/Mobiles: activation lock, MDM enrollment, factory reset protection",
+      "Laptops/Desktops: BIOS locked - waiting on customer to provide password",
+      "Any device: customer initiates quarantine with instructions for later processing"
+    ],
+    "process": [
+      "1. Device sent to quarantine if erasure cannot be completed",
+      "2. Engineer documents reason (locked status, missing password, etc.)",
+      "3. Device flagged in system for investigation",
+      "4. Contact customer for password, unlock permission, or MDM unenrollment",
+      "5. Once customer provides solution, device moves back to engineering workflow"
+    ],
+    "keywords": ["locked", "password", "bios-lock", "mdm", "customer-password", "investigation", "firmware-lock"]
   },
   "common_issues": {
-    "note": "Add common issues, troubleshooting steps, and escalation procedures as you encounter them",
-    "pending": true
+    "chromebooks": {
+      "issue": "Chromebook procedures are complex and error-prone",
+      "details": "Many staff struggle with chromebook erasure procedures. Requires understanding of Powerwash, Dev Mode, Recovery mode, and remote desktop connection. Takes extra training and practice.",
+      "expertise": "Louis is experienced with chromebook procedures - consult if stuck",
+      "difficulty": "High"
+    },
+    "blancco_software": {
+      "issue": "Blancco software errors or failures",
+      "resolution": "Contact Blancco support for technical issues",
+      "escalation": "Support ticket with error logs"
+    },
+    "printer_issues_ia": {
+      "location": "IA team",
+      "equipment": "Zebra printers",
+      "issue": "Printer malfunctions or offline",
+      "resolution": "Usually resolved by unplugging and replugging the printer"
+    },
+    "printer_driver_installation": {
+      "issue": "After installing Zebra printer drivers, initially the plugged-in printer doesn't work",
+      "solution": "Swap the printer with another working printer temporarily. The system will create a '(copy 1)' instance of the printer that resolves the issue.",
+      "workaround": "Known quirk with Zebra driver installation - physical swap is fastest fix"
+    }
+  },
+  "additional_resources": {
+    "networking_reset_procedures": {
+      "location": "Local folder (networking device reset procedures)",
+      "description": "Comprehensive collection of networking device factory reset procedures from when processes were DIY. Covers various manufacturers and models. Use as reference when Novafox Hydra is unavailable or for specific device guidance.",
+      "usage": "Consult for device-specific reset steps, alternatives to Novafox"
+    },
+    "password_cheat_sheet": {
+      "location": "QA team area",
+      "description": "Common device passwords provided by customers or standard defaults",
+      "usage": "Reference when needing BIOS or device passwords during erasure"
+    }
   }
 }
