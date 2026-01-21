@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -43,8 +43,27 @@ function createWindow() {
 }
 
 function createTray() {
-    // Use a simple icon for now (you can replace with a proper .ico file)
-    tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'));
+    try {
+        // Use existing icon from static folder
+        const iconPath = path.join(__dirname, '..', 'static', 'greenie.ico');
+        tray = new Tray(iconPath);
+    } catch (err) {
+        console.warn('Could not load tray icon:', err.message);
+        // Final fallback - create simple nativeImage
+        try {
+            const img = nativeImage.createEmpty();
+            img.addRepresentation({
+                scaleFactor: 1.0,
+                width: 16,
+                height: 16,
+                buffer: Buffer.alloc(16 * 16 * 4, 0x00ff0080)
+            });
+            tray = new Tray(img);
+        } catch (e) {
+            console.error('Failed to create tray:', e.message);
+            return;
+        }
+    }
     
     const contextMenu = Menu.buildFromTemplate([
         {

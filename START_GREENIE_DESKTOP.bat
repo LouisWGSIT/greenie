@@ -1,8 +1,21 @@
 @echo off
-echo Installing Greenie Desktop dependencies...
-cd electron
-call npm install
+cls
 echo.
-echo Starting Greenie Desktop...
+echo ========================================
+echo   Greenie Desktop - Starting...
+echo ========================================
+echo.
+
+cd electron
+
+if not exist node_modules (
+    echo Installing dependencies...
+    call npm install
+    echo.
+)
+
+echo Starting Greenie...
 call npm start
+
 pause
+

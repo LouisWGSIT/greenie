@@ -4,16 +4,20 @@
   "description": "Greenie Desktop - AI Assistant Overlay",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "build:win": "electron-builder --win --x64",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "setup": "node setup-icon.js",
+    "start": "npm run setup && electron .",
+    "build:win": "npm run setup && electron-builder --win --x64",
+    "build:mac": "npm run setup && electron-builder --mac",
+    "build:linux": "npm run setup && electron-builder --linux"
   },
   "build": {
     "appId": "com.greensafeit.greenie",
     "productName": "Greenie",
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
@@ -26,7 +30,7 @@
   "author": "Greensafe IT",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.5.0"
   }
 }
