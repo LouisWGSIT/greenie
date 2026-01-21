@@ -173,6 +173,7 @@ async def health(request: Request):
         "ok": True,
         "groq_configured": bool(GROQ_API_KEY),
         "model": DEFAULT_MODEL,
+        "models": MODEL_CANDIDATES,
         "security": {
             "network_only_mode": NETWORK_ONLY_MODE,
             "client_ip": client_ip,
@@ -648,6 +649,20 @@ async def admin_dashboard():
             .refresh-btn:hover {
                 background: rgba(0, 255, 0, 0.3);
             }
+
+            .action-btn {
+                background: rgba(0, 255, 0, 0.15);
+                border: 1px solid #00ff00;
+                color: #00ff00;
+                padding: 6px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.85em;
+            }
+
+            .action-btn:hover {
+                background: rgba(0, 255, 0, 0.25);
+            }
         </style>
     </head>
     <body>
@@ -726,6 +741,7 @@ async def admin_dashboard():
                                     <th>Error Type</th>
                                     <th>Message</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -736,6 +752,9 @@ async def admin_dashboard():
                                         <td><span class="error-badge ${log.error_type.split('_')[0]}">${log.error_type}</span></td>
                                         <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">${log.error_message}</td>
                                         <td><span class="status-badge ${log.resolved}">${log.resolved}</span></td>
+                                        <td>
+                                            ${log.resolved !== 'resolved' ? `<button class="action-btn" onclick="markResolved(${log.id})">Mark resolved</button>` : ''}
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -749,6 +768,21 @@ async def admin_dashboard():
                 }
             }
             
+            async function markResolved(id) {
+                try {
+                    await fetch(`/admin/logs/${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ resolved: 'resolved' })
+                    });
+                    await loadStats();
+                    await loadLogs();
+                } catch (error) {
+                    console.error('Failed to mark resolved:', error);
+                    alert('Failed to mark resolved');
+                }
+            }
+
             // Load data on page load
             window.addEventListener('load', () => {
                 loadStats();
@@ -813,8 +847,25 @@ class UncertaintyLogRequest(BaseModel):
 
 # Groq API configuration (free tier: 30 req/min, 14,400 tokens/min)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-# Allow overriding the Groq model; default to a currently available model
-DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama3-8b-8192")  # Options: llama3-8b-8192, mixtral-8x7b-32768, gemma-7b-it
+
+# Allow overriding the Groq model list via GROQ_MODEL (comma-separated). We default to currently available models.
+_cfg_models = [m.strip() for m in os.environ.get("GROQ_MODEL", "").split(",") if m.strip()]
+MODEL_CANDIDATES = _cfg_models or [
+    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",
+    "mixtral-8x7b-32768",
+    "gemma-7b-it",
+]
+DEFAULT_MODEL = MODEL_CANDIDATES[0]
+
+def model_candidates(requested: str | None = None) -> list[str]:
+    """Return a preference-ordered list of models to try (deduped)."""
+    preferred = [requested] if requested else [DEFAULT_MODEL]
+    out: list[str] = []
+    for m in preferred + MODEL_CANDIDATES:
+        if m and m not in out:
+            out.append(m)
+    return out
 
 # Initialize Groq client
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
@@ -1060,8 +1111,9 @@ def _build_prompt_and_payload(req: ChatRequest):
 
     prompt = system_text + topic_text + knowledge_text + mem_text + session_text + req.message
 
+    chosen_model = model_candidates(req.model)[0]
     payload = {
-        "model": req.model or DEFAULT_MODEL,
+        "model": chosen_model,
         "prompt": prompt,
     }
     ol_timeout = 120
@@ -1220,8 +1272,9 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
 
         prompt = system_text + topic_text + knowledge_text + mem_text + session_text + req.message
 
+        chosen_model = model_candidates(req.model)[0]
         payload = {
-            "model": req.model or DEFAULT_MODEL,
+            "model": chosen_model,
             "prompt": prompt,
             "stream": False  # single JSON response
         }
@@ -1232,7 +1285,8 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
                 ol_timeout = 30
                 # prefer a quicker model option if not explicitly set
                 if not req.model:
-                    payload['model'] = 'llama3-8b-8192'  # Faster, smaller model
+                    fast_model = model_candidates("llama-3.1-8b-instant")[0]
+                    payload['model'] = fast_model
         except Exception:
             pass
 
@@ -1281,37 +1335,45 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
                 if not groq_client:
                     logger.error("Groq API key not set. Set GROQ_API_KEY environment variable.")
                     return {"error": "LLM service not configured. Please set GROQ_API_KEY environment variable."}
-                
+
                 try:
-                    # Convert prompt to Groq chat format
-                    chat_completion = groq_client.chat.completions.create(
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are Greenie, a helpful IT support assistant."
-                            },
-                            {
-                                "role": "user",
-                                "content": payload["prompt"]
-                            }
-                        ],
-                        model=payload.get('model', DEFAULT_MODEL),
-                        temperature=0.7,
-                        max_tokens=2048,
-                        timeout=ol_timeout
-                    )
-                    
-                    reply = chat_completion.choices[0].message.content
-                    logger.info(f"Groq reply received ({len(reply)} chars, model={payload.get('model', DEFAULT_MODEL)})")
-                    
-                except Exception as e:
-                    logger.error(f"Groq API error: {type(e).__name__}: {e}")
-                    if "timeout" in str(e).lower():
-                        return {"error": "timeout", "message": f"Model timed out after {ol_timeout}s.", "suggestions": ["enable_fast", "retry"]}
-                    elif "rate_limit" in str(e).lower() or "429" in str(e):
-                        return {"error": "Rate limit reached. Please wait a moment and try again."}
+                    models_to_try = model_candidates(payload.get('model'))
+                    last_err = None
+                    for m in models_to_try:
+                        try:
+                            chat_completion = groq_client.chat.completions.create(
+                                messages=[
+                                    {
+                                        "role": "system",
+                                        "content": "You are Greenie, a helpful IT support assistant."
+                                    },
+                                    {
+                                        "role": "user",
+                                        "content": payload["prompt"]
+                                    }
+                                ],
+                                model=m,
+                                temperature=0.7,
+                                max_tokens=2048,
+                                timeout=ol_timeout
+                            )
+                            reply = chat_completion.choices[0].message.content
+                            logger.info(f"Groq reply received ({len(reply)} chars, model={m})")
+                            payload['model'] = m
+                            break
+                        except Exception as e:
+                            last_err = e
+                            msg = str(e).lower()
+                            logger.warning("Groq API error on model %s: %s", m, e)
+                            if any(term in msg for term in ["decommissioned", "not found", "does not exist"]):
+                                continue  # try next model
+                            if "timeout" in msg:
+                                return {"error": "timeout", "message": f"Model timed out after {ol_timeout}s.", "suggestions": ["enable_fast", "retry"]}
+                            if "rate_limit" in msg or "429" in msg:
+                                return {"error": "Rate limit reached. Please wait a moment and try again."}
+                            return {"error": f"LLM API error: {str(e)[:100]}", "models_tried": models_to_try}
                     else:
-                        return {"error": f"LLM API error: {str(e)[:100]}"}
+                        return {"error": f"LLM API error: {str(last_err)[:120] if last_err else 'unknown'}", "models_tried": models_to_try}
                 finally:
                     elapsed = _time.time() - start_time
                     logger.info('Groq API call took %.2fs (fast=%s, model=%s, prompt_len=%d)', elapsed, getattr(req, 'fast', False), payload.get('model'), len(payload.get('prompt','')))
@@ -1396,31 +1458,48 @@ async def chat_stream(req: ChatRequest):
                 if not groq_client:
                     yield f"event:error\ndata: LLM service not configured\n\n"
                     return
-                
-                # Use Groq streaming
-                stream = groq_client.chat.completions.create(
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are Greenie, a helpful IT support assistant."
-                        },
-                        {
-                            "role": "user",
-                            "content": payload["prompt"]
-                        }
-                    ],
-                    model=payload.get('model', DEFAULT_MODEL),
-                    temperature=0.7,
-                    max_tokens=2048,
-                    stream=True
-                )
-                
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        text = chunk.choices[0].delta.content
-                        yield f"data: {text}\n\n"
-                        accumulated += text
-                
+
+                models_to_try = model_candidates(payload.get('model'))
+                last_err = None
+
+                for m in models_to_try:
+                    try:
+                        stream = groq_client.chat.completions.create(
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": "You are Greenie, a helpful IT support assistant."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": payload["prompt"]
+                                }
+                            ],
+                            model=m,
+                            temperature=0.7,
+                            max_tokens=2048,
+                            stream=True
+                        )
+
+                        for chunk in stream:
+                            if chunk.choices[0].delta.content:
+                                text = chunk.choices[0].delta.content
+                                yield f"data: {text}\n\n"
+                                accumulated += text
+                        payload['model'] = m
+                        break
+                    except Exception as e:
+                        last_err = e
+                        msg = str(e).lower()
+                        logger.warning("Groq stream error on model %s: %s", m, e)
+                        if any(term in msg for term in ["decommissioned", "not found", "does not exist"]):
+                            continue  # try next model
+                        yield f"event:error\ndata: {str(e)}\n\n"
+                        return
+                else:
+                    yield f"event:error\ndata: LLM API error: {str(last_err) if last_err else 'unknown'} (models tried: {models_to_try})\n\n"
+                    return
+
                 # after stream completes, append to session history if needed
                 try:
                     if getattr(req, 'conversation_mode', True) and getattr(req, 'session_id', None):
