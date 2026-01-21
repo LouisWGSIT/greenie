@@ -29,6 +29,19 @@ const registerError = document.getElementById('registerError');
 // Initialize
 (async function init() {
     apiUrl = await window.electronAPI.getApiUrl();
+    console.log('[Greenie] Initialized with API URL:', apiUrl);
+    
+    // Test backend connectivity on startup
+    try {
+        const healthResponse = await fetch(`${apiUrl}/health`, { timeout: 3000 });
+        if (healthResponse.ok) {
+            console.log('[Greenie] Backend is reachable');
+        } else {
+            console.warn('[Greenie] Backend returned:', healthResponse.status);
+        }
+    } catch (e) {
+        console.error('[Greenie] Cannot reach backend on startup:', e.message);
+    }
     
     // Check for saved token
     const saved = localStorage.getItem('greenie_auth');
@@ -139,13 +152,43 @@ registerForm.addEventListener('submit', async (e) => {
     const email = e.target.email.value;
     const password = e.target.password.value;
     
+    console.log('[Greenie Register] Attempting to register with:', { username, email, apiUrl });
+    
     try {
+        // First, verify backend is reachable
+        console.log('[Greenie Register] Testing backend connectivity...');
+        let healthOk = false;
+        try {
+            const healthCheck = await fetch(`${apiUrl}/health`, { timeout: 5000 });
+            healthOk = healthCheck.ok;
+            console.log('[Greenie Register] Health check:', healthOk ? 'OK' : `Failed (${healthCheck.status})`);
+        } catch (hErr) {
+            console.error('[Greenie Register] Health check error:', hErr.message);
+        }
+        
+        if (!healthOk) {
+            registerError.textContent = `Cannot reach server at ${apiUrl}`;
+            registerError.classList.add('visible');
+            logErrorToBackend({
+                message: `Backend unreachable at startup of registration`,
+                type: 'backend_unreachable',
+                details: {
+                    apiUrl: apiUrl,
+                    timestamp: new Date().toISOString()
+                }
+            });
+            return;
+        }
+        
+        console.log('[Greenie Register] Sending registration request...');
         const response = await fetch(`${apiUrl}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password }),
             timeout: 10000
         });
+        
+        console.log('[Greenie Register] Response status:', response.status);
         
         if (!response.ok) {
             try {
@@ -170,6 +213,7 @@ registerForm.addEventListener('submit', async (e) => {
         }
         
         registerError.classList.remove('visible');
+        console.log('[Greenie Register] Registration successful, auto-logging in...');
         
         // Auto-login after registration
         const loginResponse = await fetch(`${apiUrl}/auth/login`, {
@@ -189,12 +233,14 @@ registerForm.addEventListener('submit', async (e) => {
                 username: currentUsername
             }));
             
+            console.log('[Greenie Register] Login successful, showing chat panel');
             showChatPanel();
         } else {
             registerError.textContent = `Auto-login failed: ${loginResponse.status}`;
             registerError.classList.add('visible');
         }
     } catch (error) {
+        console.error('[Greenie Register] Caught error:', error);
         registerError.textContent = `Network error: ${error.message}`;
         registerError.classList.add('visible');
         
