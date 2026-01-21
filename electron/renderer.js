@@ -200,11 +200,26 @@ function showChatPanel(isGuest = false) {
     addMessage('Greenie', 'Hi there! How can I help you today?', 'assistant');
 }
 
-// Add Message
+// Add Message with Avatars
 function addMessage(sender, text, type = 'user') {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${type}`;
-    msgDiv.innerHTML = `<div class="message-bubble">${escapeHtml(text)}</div>`;
+    
+    let avatarHtml = '';
+    if (type === 'assistant') {
+        // Greenie avatar - show Greenie.png icon from assets
+        // Use relative path since this runs in renderer context
+        avatarHtml = `<img src="../assets/Greenie.png" alt="Greenie" class="avatar greenie-avatar" onerror="this.style.display='none'" />`;
+    } else if (type === 'user' || type === 'thinking') {
+        // User avatar - show first letter of username
+        const initial = (currentUsername || 'G')[0].toUpperCase();
+        avatarHtml = `<div class="avatar user-avatar">${initial}</div>`;
+    }
+    
+    msgDiv.innerHTML = `
+        ${avatarHtml}
+        <div class="message-bubble">${escapeHtml(text)}</div>
+    `;
     messages.appendChild(msgDiv);
     messages.scrollTop = messages.scrollHeight;
 }
@@ -230,6 +245,19 @@ async function sendMessage() {
     addMessage('Greenie', 'Thinking...', 'thinking');
     
     try {
+        // Check if backend is reachable
+        try {
+            const healthCheck = await fetch(`${apiUrl}/health`, { timeout: 3000 });
+            if (!healthCheck.ok) {
+                throw new Error('Backend not responding');
+            }
+        } catch (e) {
+            const thinkingMsg = messages.querySelector('.thinking');
+            if (thinkingMsg) thinkingMsg.remove();
+            addMessage('Greenie', '❌ Cannot reach the server. Please start the FastAPI backend:\n\nIn a new terminal:\ncd "C:\\Users\\Louisw\\Documents\\AI Agent"\npython app.py', 'error');
+            return;
+        }
+
         const headers = {
             'Content-Type': 'application/json'
         };
@@ -245,7 +273,8 @@ async function sendMessage() {
         });
         
         if (!response.ok) {
-            throw new Error('Chat request failed');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Chat request failed');
         }
         
         const data = await response.json();
@@ -262,7 +291,8 @@ async function sendMessage() {
         if (thinkingMsg) {
             thinkingMsg.remove();
         }
-        addMessage('Greenie', 'Sorry, I encountered an error. Please try again.', 'assistant');
+        const errorMsg = error.message || 'Unknown error occurred';
+        addMessage('Greenie', `❌ Error: ${errorMsg}`, 'error');
     }
 }
 
