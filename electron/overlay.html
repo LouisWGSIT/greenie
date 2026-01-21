@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greenie Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        /* Floating Button (Minimized State) */
+        .floating-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #00ff00, #00cc00);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 255, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            transition: all 0.3s ease;
+            z-index: 10000;
+            user-select: none;
+            -webkit-app-region: no-drag;
+        }
+
+        .floating-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(0, 255, 0, 0.8);
+        }
+
+        .floating-button.hidden {
+            display: none;
+        }
+
+        /* Chat Container (Expanded State) */
+        .chat-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 400px;
+            height: 600px;
+            background: rgba(30, 30, 45, 0.98);
+            border-radius: 15px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            z-index: 10000;
+        }
+
+        .chat-container.active {
+            display: flex;
+        }
+
+        /* Chat Header */
+        .chat-header {
+            background: linear-gradient(135deg, #00ff00, #00cc00);
+            padding: 15px 20px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            -webkit-app-region: drag;
+            cursor: move;
+        }
+
+        .chat-header h2 {
+            color: #000;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            -webkit-app-region: no-drag;
+        }
+
+        .header-btn {
+            background: rgba(0, 0, 0, 0.2);
+            border: none;
+            color: #000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .header-btn:hover {
+            background: rgba(0, 0, 0, 0.3);
+            transform: scale(1.1);
+        }
+
+        /* User Info Bar */
+        .user-info {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 10px 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+        }
+
+        .user-info.active {
+            display: flex;
+        }
+
+        .user-name {
+            color: #00ff00;
+            font-size: 0.9em;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 5px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        /* Auth Panel */
+        .auth-panel {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            color: #fff;
+        }
+
+        .auth-panel.hidden {
+            display: none;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            color: #00ff00;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #b0b8d0;
+            font-size: 0.9em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background: #00ff00;
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .auth-btn:hover {
+            background: #00cc00;
+            transform: translateY(-2px);
+        }
+
+        .error-message {
+            color: #ff4444;
+            font-size: 0.85em;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error-message.visible {
+            display: block;
+        }
+
+        .guest-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #8a92b2;
+            font-size: 0.85em;
+        }
+
+        .guest-link a {
+            color: #00ff00;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .guest-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Chat Panel */
+        .chat-panel {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+        }
+
+        .chat-panel.active {
+            display: flex;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            gap: 10px;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .message.assistant .message-bubble {
+            background: rgba(0, 255, 0, 0.15);
+            color: #fff;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .message.user .message-bubble {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .message.thinking .message-bubble {
+            background: rgba(255, 255, 255, 0.05);
+            color: #8a92b2;
+            font-style: italic;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(0, 255, 0, 0.2);
+            display: none;
+        }
+
+        .input-area.active {
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 0, 0.2);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        .message-input:focus {
+            outline: none;
+            border-color: #00ff00;
+        }
+
+        .send-btn {
+            background: #00ff00;
+            border: none;
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #00cc00;
+            transform: scale(1.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating Button (Minimized) -->
+    <div class="floating-button" id="floatingBtn">💬</div>
+
+    <!-- Chat Container (Expanded) -->
+    <div class="chat-container" id="chatContainer">
+        <!-- Header -->
+        <div class="chat-header">
+            <h2>Greenie</h2>
+            <div class="header-buttons">
+                <button class="header-btn" id="minimizeBtn" title="Minimize">−</button>
+                <button class="header-btn" id="closeBtn" title="Close">&times;</button>
+            </div>
+        </div>
+
+        <!-- User Info -->
+        <div class="user-info" id="userInfo">
+            <span class="user-name">Logged in as: <span id="currentUser"></span></span>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
+        </div>
+
+        <!-- Auth Panel -->
+        <div class="auth-panel" id="authPanel">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign In</button>
+                <button class="auth-tab" data-tab="register">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <form class="auth-form active" id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="auth-btn">Sign In</button>
+                <div class="error-message" id="loginError"></div>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form" id="registerForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Email (@greensafeit.com)</label>
+                    <input type="email" name="email" required autocomplete="email" placeholder="yourname@greensafeit.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="auth-btn">Create Account</button>
+                <div class="error-message" id="registerError"></div>
+            </form>
+
+            <div class="guest-link">
+                <a id="guestLink">Continue as guest</a>
+            </div>
+        </div>
+
+        <!-- Chat Panel -->
+        <div class="chat-panel" id="chatPanel">
+            <div class="messages" id="messages"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area" id="inputArea">
+            <input type="text" class="message-input" id="messageInput" placeholder="Type your message...">
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
