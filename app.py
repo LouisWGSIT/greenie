@@ -136,19 +136,10 @@ async def health():
         "model": DEFAULT_MODEL
     }
     
-    # Try a quick ping to Groq if key is set
-    if groq_client:
-        try:
-            # Quick test with minimal tokens
-            test = groq_client.chat.completions.create(
-                messages=[{"role": "user", "content": "ping"}],
-                model=DEFAULT_MODEL,
-                max_tokens=5,
-                timeout=5
-            )
-            status["groq_status"] = "connected"
-        except Exception as e:
-            status["groq_status"] = f"error: {str(e)[:50]}"
+    # Just report configuration status, don't test API on every health check
+    # (avoids rate limiting and slow responses)
+    if GROQ_API_KEY:
+        status["groq_status"] = "configured"
     else:
         status["groq_status"] = "not_configured"
     

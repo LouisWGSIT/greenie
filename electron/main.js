@@ -54,8 +54,8 @@ function createWindow() {
         }
     });
 
-    // Start minimized
-    mainWindow.hide();
+    // Show window on startup
+    mainWindow.show();
 }
 
 function createTray() {

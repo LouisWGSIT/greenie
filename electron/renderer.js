@@ -8,6 +8,8 @@ const floatingBtn = document.getElementById('floatingBtn');
 const chatContainer = document.getElementById('chatContainer');
 const minimizeBtn = document.getElementById('minimizeBtn');
 const closeBtn = document.getElementById('closeBtn');
+const updateBtn = document.getElementById('updateBtn');
+const settingsBtn = document.getElementById('settingsBtn');
 const authPanel = document.getElementById('authPanel');
 const chatPanel = document.getElementById('chatPanel');
 const userInfo = document.getElementById('userInfo');
@@ -69,7 +71,28 @@ minimizeBtn.addEventListener('click', () => {
 });
 
 closeBtn.addEventListener('click', async () => {
-    await window.electronAPI.minimizeWindow();
+    await window.electronAPI.closeApp();
+});
+
+updateBtn.addEventListener('click', async () => {
+    console.log('[Greenie] Checking for updates...');
+    updateBtn.textContent = '⏳';
+    try {
+        const result = await window.electronAPI.checkForUpdates();
+        console.log('[Greenie] Update check result:', result);
+        updateBtn.textContent = result.updateAvailable ? '⬇' : '✓';
+        setTimeout(() => {
+            updateBtn.textContent = '⬇';
+        }, 2000);
+    } catch (e) {
+        console.error('[Greenie] Update check failed:', e);
+        updateBtn.textContent = '⬇';
+    }
+});
+
+settingsBtn.addEventListener('click', () => {
+    console.log('[Greenie] Settings clicked - future feature');
+    // Future: Open settings modal
 });
 
 // Auth Tabs
@@ -365,7 +388,8 @@ async function sendMessage() {
         const response = await fetch(`${apiUrl}/chat`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ message: text })
+            body: JSON.stringify({ message: text }),
+            timeout: 30000  // 30 second timeout for Groq API (can be slow)
         });
         
         if (!response.ok) {
