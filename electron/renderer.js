@@ -98,8 +98,16 @@ updateBtn.addEventListener('click', async () => {
 });
 
 settingsBtn.addEventListener('click', () => {
-    console.log('[Greenie] Settings clicked - future feature');
-    // Future: Open settings modal
+    console.log('[Greenie] Status check');
+    // Show app status in a simple alert or info message
+    const status = `Greenie Status:
+- User: ${currentUsername || 'Guest'}
+- Connected: Yes
+- Version: 1.0.0
+- API: ${apiUrl}`;
+    
+    // Add as info message to chat
+    addMessage('Greenie', `📊 ${status.replace(/\n/g, ' | ')}`, 'assistant');
 });
 
 // Auth Tabs
@@ -406,15 +414,34 @@ async function sendMessage() {
         
         const data = await response.json();
         
+        console.log('[Greenie Chat] Response received:', data);
+        
         // Remove thinking message
         const thinkingMsg = messages.querySelector('.thinking');
         if (thinkingMsg) {
             thinkingMsg.remove();
         }
         
-        // Backend returns "reply", not "response"
-        const reply = data.reply || data.response || data.message || 'No response';
-        console.log('[Greenie Chat] Response received:', reply.substring(0, 100));
+        // Handle error responses from backend
+        if (data.error) {
+            console.error('[Greenie Chat] Backend error:', data.error);
+            addMessage('Greenie', `❌ Error: ${data.error}`, 'error');
+            
+            // Log to admin dashboard
+            logErrorToBackend({
+                message: `Chat error: ${data.error}`,
+                type: 'chat_error',
+                details: {
+                    timestamp: new Date().toISOString(),
+                    userMessage: text
+                }
+            });
+            return;
+        }
+        
+        // Handle successful responses
+        const reply = data.reply || data.response || data.message || 'No response received';
+        console.log('[Greenie Chat] Displaying reply:', reply.substring(0, 100));
         addMessage('Greenie', reply, 'assistant');
     } catch (error) {
         const thinkingMsg = messages.querySelector('.thinking');

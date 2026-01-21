@@ -263,6 +263,7 @@
             flex: 1;
             display: none;
             flex-direction: column;
+            min-height: 0;  /* Allow flex children to shrink below content size */
         }
 
         .chat-panel.active {
@@ -276,6 +277,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
+            min-height: 0;  /* Allow scrolling when content exceeds container */
         }
 
         .message {
