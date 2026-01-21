@@ -280,6 +280,28 @@
       "workaround": "Known quirk with Zebra driver installation - physical swap is fastest fix"
     }
   },
+  "general_device_knowledge": {
+    "bios_password_recovery": {
+      "dell_legacy_master_password": {
+        "description": "Alternate path for older Dell systems with BIOS passwords",
+        "when_to_use": "Legacy Dell devices that show a challenge code on the BIOS password screen",
+        "process": [
+          "1. On the locked Dell BIOS screen, note the challenge code shown for password recovery",
+          "2. Go to Dell's BIOS recovery website (master password generator)",
+          "3. Enter the challenge code (and service tag if prompted)",
+          "4. The site returns a long one-time master password",
+          "5. Enter the provided password in BIOS to clear the existing BIOS password",
+          "6. After clearing, set a new password if required or leave blank per policy"
+        ],
+        "notes": [
+          "Requires network access to reach Dell's site",
+          "Applies to older/legacy Dell models that present a recovery code",
+          "Use only with proper authorization on customer-owned equipment"
+        ],
+        "keywords": ["dell", "bios", "master-password", "challenge-code", "legacy"]
+      }
+    }
+  },
   "additional_resources": {
     "networking_reset_procedures": {
       "location": "Local folder (networking device reset procedures)",
