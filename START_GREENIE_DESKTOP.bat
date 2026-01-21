@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 cls
 echo.
 echo ========================================
@@ -16,22 +17,27 @@ if not exist node_modules (
 
 echo Starting Greenie...
 echo Launching app in background...
-start /B npm start
+
+REM Start npm in a separate detached process
+start "Greenie Backend" /B cmd /c npm start
+
+REM Give it time to start
 timeout /t 2 /nobreak
 
 echo.
 echo ========================================
-echo   ✓ Greenie is starting!
+echo   GREENIE IS RUNNING
 echo ========================================
 echo.
-echo Look for the GREEN ICON in your system tray.
+echo Looking for the GREEN ICON in system tray...
 echo (Bottom-right corner of your screen)
 echo.
 echo Right-click the green icon to:
-echo   • Show the chat window
-echo   • Quit the app
+echo   * Show the chat window
+echo   * Quit the app
 echo.
-echo You can close this window now.
+echo Closing this window WILL NOT stop Greenie.
 echo.
-pause
+echo Press any key to close this startup window...
+pause >nul
 exit

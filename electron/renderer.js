@@ -225,6 +225,9 @@ function addMessage(sender, text, type = 'user') {
 }
 
 function escapeHtml(text) {
+    if (!text || typeof text !== 'string') {
+        return String(text || '');
+    }
     const map = {
         '&': '&amp;',
         '<': '&lt;',
