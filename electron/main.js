@@ -12,6 +12,18 @@ const API_URL = 'https://greenie-t89u.onrender.com';
 // Configure auto-updater
 autoUpdater.checkForUpdatesAndNotify();
 
+// Ensure only one instance runs
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            mainWindow.show();
+        }
+    });
+}
+
 function createWindow() {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
     
