@@ -1459,7 +1459,7 @@ async def chat(req: ChatRequest, current_user: User | None = Depends(get_current
                                 messages=[
                                     {
                                         "role": "system",
-                                        "content": "You are Greenie, a helpful IT support assistant."
+                                        "content": "You are Greenie, an IT support assistant for a warehouse equipment refurbishment operation. Be blunt and straight-to-the-point. Tell people exactly what they need to know without fluff. Be helpful but direct. If something won't work, say so clearly. Reference specific procedures and tools from the knowledge base when available."
                                     },
                                     {
                                         "role": "user",
@@ -1582,7 +1582,7 @@ async def chat_stream(req: ChatRequest):
                             messages=[
                                 {
                                     "role": "system",
-                                    "content": "You are Greenie, a helpful IT support assistant."
+                                    "content": "You are Greenie, an IT support assistant for a warehouse equipment refurbishment operation. Be blunt and straight-to-the-point. Tell people exactly what they need to know without fluff. Be helpful but direct. If something won't work, say so clearly. Reference specific procedures and tools from the knowledge base when available."
                                 },
                                 {
                                     "role": "user",

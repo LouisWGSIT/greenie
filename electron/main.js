@@ -161,10 +161,13 @@ app.on('window-all-closed', () => {
 autoUpdater.on('update-available', () => {
     console.log('Update available');
     mainWindow.webContents.send('update-available');
+    // Auto-start download
+    autoUpdater.downloadUpdate();
 });
 
 autoUpdater.on('update-not-available', () => {
     console.log('No updates available');
+    mainWindow.webContents.send('update-not-available');
 });
 
 autoUpdater.on('update-downloaded', () => {
@@ -172,6 +175,11 @@ autoUpdater.on('update-downloaded', () => {
     mainWindow.webContents.send('update-downloaded');
     // Auto-install on quit
     autoUpdater.quitAndInstall();
+});
+
+autoUpdater.on('error', (error) => {
+    console.error('Update error:', error);
+    mainWindow.webContents.send('update-error', error.message);
 });
 
 // IPC handlers for communication with renderer
@@ -195,4 +203,24 @@ ipcMain.handle('check-for-updates', async () => {
         currentVersion: app.getVersion(),
         availableVersion: result.updateInfo.version
     };
+});
+
+ipcMain.handle('trigger-update', async () => {
+    try {
+        console.log('Triggering update download and install...');
+        // Check for updates and download if available
+        const result = await autoUpdater.checkForUpdates();
+        if (result && result.updateInfo.version !== app.getVersion()) {
+            console.log('Update available, downloading...');
+            // Download is triggered by update-available event
+            // Message will be sent to renderer when ready
+            return { status: 'checking' };
+        } else {
+            console.log('No updates available');
+            return { status: 'no-updates' };
+        }
+    } catch (e) {
+        console.error('Update trigger error:', e);
+        return { status: 'error', message: e.message };
+    }
 });

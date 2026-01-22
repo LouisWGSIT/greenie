@@ -281,6 +281,40 @@
     }
   },
   "general_device_knowledge": {
+    "bios_access_keys": {
+      "description": "Command keys and boot menu keys for different manufacturers",
+      "dell": {
+        "bios_entry": "Delete or F2 (during startup splash)",
+        "boot_menu": "F12 or F2 (look for 'Boot Options' or 'Boot Menu' during splash)",
+        "common_bios_settings": ["Secure Boot (turn off)", "Virtualization (turn off)", "Security Chip (clear/reset)"]
+      },
+      "hp": {
+        "bios_entry": "F10 or Esc then F10 (during startup)",
+        "boot_menu": "F9 or Esc then F9 (look for 'Boot Device Order')",
+        "common_bios_settings": ["Secure Boot (turn off)", "Virtualization (turn off)"]
+      },
+      "lenovo": {
+        "bios_entry": "F2 or Enter (during Lenovo splash, watch for 'Press F2 for Setup')",
+        "boot_menu": "F12 or F11 (during splash)",
+        "common_bios_settings": ["Secure Boot (turn off)", "TPM (clear if locked)"]
+      },
+      "acer": {
+        "bios_entry": "Delete or F2 (during splash)",
+        "boot_menu": "F12 (during splash)",
+        "common_bios_settings": ["Secure Boot (turn off)"]
+      },
+      "asus": {
+        "bios_entry": "Delete or F2 (during splash)",
+        "boot_menu": "F12 or F8 (during splash)",
+        "common_bios_settings": ["Secure Boot (turn off)", "Virtualization (turn off)"]
+      },
+      "notes": [
+        "Timing is critical - watch for splash screen or BIOS logo during boot",
+        "Some devices require multiple key presses or holding the key",
+        "If wrong key pressed, device may boot normally - reboot and try again",
+        "After making BIOS changes, save and exit (usually F10 or specific save option)"
+      ]
+    },
     "bios_password_recovery": {
       "dell_legacy_master_password": {
         "description": "Alternate path for older Dell systems with BIOS passwords",
@@ -300,6 +334,94 @@
         ],
         "keywords": ["dell", "bios", "master-password", "challenge-code", "legacy"]
       }
+    }
+  },
+  "diagnostics_and_troubleshooting": {
+    "blancco_issues": {
+      "issue": "Blancco won't start or USB not recognized",
+      "solutions": [
+        "1. Try a different USB port (preferably USB 2.0, some devices have issues with USB 3.0)",
+        "2. Try a different Blancco USB (may be corrupted)",
+        "3. Check BIOS - ensure boot priority is set to USB before hard drive",
+        "4. Disable Secure Boot in BIOS - some devices won't boot Blancco with it enabled",
+        "5. If device is brand new, may need driver installation first - use Blancco driver USB if available",
+        "6. Contact Blancco support with error code if displayed"
+      ],
+      "keywords": ["blancco", "usb", "boot", "startup"]
+    },
+    "device_stuck_in_diagnostics": {
+      "issue": "Device appears stuck during Blancco diagnostics or erasure",
+      "solutions": [
+        "1. Wait at least 15-20 minutes - Blancco diagnostics can take time on large drives or slow devices",
+        "2. Check if there's any activity (LED blinking, fan running) - indicates it's still working",
+        "3. If truly stuck, force power down (hold power 10-15 seconds)",
+        "4. Reboot and try again - may be a temporary glitch",
+        "5. Try a different USB port or Blancco USB",
+        "6. If persistently stuck, device may need to go to quarantine for investigation"
+      ],
+      "keywords": ["stuck", "diagnostics", "freeze", "hang"]
+    },
+    "device_wont_boot_after_erasure": {
+      "issue": "Device won't boot or gets stuck on black screen after Blancco erasure completes",
+      "solutions": [
+        "1. Remove Blancco USB and power off device completely",
+        "2. Wait 30 seconds, then power back on",
+        "3. Device may be in BIOS or boot menu - press appropriate key to continue boot (F2, Del, F12, F9 depending on manufacturer)",
+        "4. If still black screen, may need to reinstall OS or factory reset (varies by device)",
+        "5. Check documentation in knowledge base for specific device type factory reset procedure",
+        "6. If unresolvable, escalate to QA for Refurbish or Breakfix designation"
+      ],
+      "keywords": ["boot", "black-screen", "stuck", "won't-start"]
+    },
+    "password_entry_issues": {
+      "issue": "BIOS password locked but we don't have the password",
+      "solutions": [
+        "1. Check password cheat sheet in QA area - may have been provided by customer",
+        "2. Try common defaults: 'password', 'admin', '123456', blank (no password)",
+        "3. For older Dell systems: use Dell master password recovery (see Dell legacy master password section)",
+        "4. For HP/Lenovo: may have admin/user dual passwords - try both",
+        "5. If still locked, send to quarantine and request password from customer",
+        "6. Document in system that device is waiting on customer for BIOS password unlock"
+      ],
+      "keywords": ["password", "locked", "bios", "customer"]
+    },
+    "secure_boot_issues": {
+      "issue": "Device won't boot Blancco USB because Secure Boot is enabled",
+      "solutions": [
+        "1. Enter BIOS (F2, Delete, F10, etc. depending on manufacturer)",
+        "2. Find 'Secure Boot' setting (usually under Security tab)",
+        "3. Change from 'Enabled' to 'Disabled'",
+        "4. Find 'Virtualization' setting and disable that too while you're in there",
+        "5. Save changes (usually F10)",
+        "6. Try booting Blancco USB again",
+        "7. Some devices require disabling TPM or clearing security chip for full compatibility"
+      ],
+      "keywords": ["secure-boot", "enabled", "boot-usb"]
+    },
+    "network_connectivity": {
+      "issue": "Device can't connect to network during Blancco erasure (needed for autopilot check)",
+      "solutions": [
+        "1. Check Ethernet cable is plugged in (preferred for reliability)",
+        "2. If wireless, make sure WiFi is enabled in BIOS",
+        "3. Try different Ethernet port if available",
+        "4. Restart the device and Blancco process",
+        "5. Check if Blancco USB is providing network drivers - may need to wait for driver load",
+        "6. Some devices may require manual driver installation before Blancco can use network",
+        "7. If network essential and persistently failing, escalate to QA (may still be erasable, just can't verify autopilot)"
+      ],
+      "keywords": ["network", "ethernet", "wifi", "autopilot", "internet"]
+    },
+    "slow_performance": {
+      "issue": "Device is extremely slow during Blancco erasure or diagnostics",
+      "solutions": [
+        "1. Normal for older devices or those with failing hardware - patience required (can take 1-3 hours)",
+        "2. Ensure device isn't overheating - check if fans are spinning, provide airflow",
+        "3. Don't interrupt or force restart - let it complete",
+        "4. If drive is failing, Blancco will detect it - check final report",
+        "5. Slow devices may need longer allocated time on engineering bench",
+        "6. If hardware failure detected, may be Breakfix or Disposal grade"
+      ],
+      "keywords": ["slow", "performance", "hanging"]
     }
   },
   "additional_resources": {

@@ -2,6 +2,7 @@
 let apiUrl = '';
 let currentToken = null;
 let currentUsername = null;
+let sessionId = null;  // Persistent session for conversation memory
 
 // DOM Elements
 const floatingBtn = document.getElementById('floatingBtn');
@@ -32,6 +33,20 @@ const registerError = document.getElementById('registerError');
 (async function init() {
     apiUrl = await window.electronAPI.getApiUrl();
     console.log('[Greenie] Initialized with API URL:', apiUrl);
+    
+    // Generate or load session ID for conversation memory
+    const savedSession = localStorage.getItem('greenie_session');
+    if (savedSession) {
+        sessionId = savedSession;
+    } else {
+        // Generate new session ID (UUID v4)
+        sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+        localStorage.setItem('greenie_session', sessionId);
+    }
+    console.log('[Greenie] Session ID:', sessionId);
     
     // Test backend connectivity on startup
     try {
@@ -84,17 +99,58 @@ closeBtn.addEventListener('click', async () => {
 updateBtn.addEventListener('click', async () => {
     console.log('[Greenie] Checking for updates...');
     updateBtn.textContent = '⏳';
+    updateBtn.disabled = true;
     try {
-        const result = await window.electronAPI.checkForUpdates();
-        console.log('[Greenie] Update check result:', result);
-        updateBtn.textContent = result.updateAvailable ? '⬇' : '✓';
+        const result = await window.electronAPI.triggerUpdate();
+        console.log('[Greenie] Update trigger result:', result);
+        if (result.status === 'no-updates') {
+            updateBtn.textContent = '✓';
+            setTimeout(() => {
+                updateBtn.textContent = '⬇';
+                updateBtn.disabled = false;
+            }, 2000);
+        }
+        // If checking or downloading, wait for update events from main process
+    } catch (e) {
+        console.error('[Greenie] Update trigger failed:', e);
+        updateBtn.textContent = '❌';
+        updateBtn.disabled = false;
         setTimeout(() => {
             updateBtn.textContent = '⬇';
         }, 2000);
-    } catch (e) {
-        console.error('[Greenie] Update check failed:', e);
-        updateBtn.textContent = '⬇';
     }
+});
+
+// Listen for update events from main process
+window.electronAPI.onUpdateAvailable(() => {
+    console.log('[Greenie] Update is available and downloading...');
+    updateBtn.textContent = '⬇';
+});
+
+window.electronAPI.onUpdateDownloaded(() => {
+    console.log('[Greenie] Update downloaded. Will install on next restart.');
+    updateBtn.textContent = '✓';
+    updateBtn.disabled = false;
+    // Show message to user
+    addMessage('Greenie', '✓ Update downloaded! Will install on restart.', 'assistant');
+});
+
+window.electronAPI.onUpdateNotAvailable(() => {
+    console.log('[Greenie] No updates available');
+    updateBtn.textContent = '✓';
+    updateBtn.disabled = false;
+    setTimeout(() => {
+        updateBtn.textContent = '⬇';
+    }, 2000);
+});
+
+window.electronAPI.onUpdateError((error) => {
+    console.error('[Greenie] Update error:', error);
+    updateBtn.textContent = '❌';
+    updateBtn.disabled = false;
+    setTimeout(() => {
+        updateBtn.textContent = '⬇';
+    }, 2000);
 });
 
 settingsBtn.addEventListener('click', () => {
@@ -338,9 +394,16 @@ function addMessage(sender, text, type = 'user') {
     
     let avatarHtml = '';
     if (type === 'assistant') {
-        // Greenie avatar - show Greenie.png icon from assets
-        // Use relative path since this runs in renderer context
-        avatarHtml = `<img src="../assets/Greenie.png" alt="Greenie" class="avatar greenie-avatar" onerror="this.style.display='none'" />`;
+        // Greenie avatar - use base64 SVG fallback or try multiple paths
+        // First try file protocol with absolute path
+        const assetPaths = [
+            'file://c:/Users/Louisw/Documents/AI%20Agent/electron/assets/Greenie.png',
+            '../assets/Greenie.png',
+            './assets/Greenie.png',
+            '../../assets/Greenie.png'
+        ];
+        const fallbackSvg = 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%2300ff00%22/><text x=%2250%22 y=%2260%22 text-anchor=%22middle%22 font-size=%2250%22 fill=%22%23000%22>G</text></svg>';
+        avatarHtml = `<img src="${assetPaths[0]}" alt="Greenie" class="avatar greenie-avatar" onerror="this.src='${fallbackSvg}'" />`;
     } else if (type === 'user' || type === 'thinking') {
         // User avatar - show first letter of username
         const initial = (currentUsername || 'G')[0].toUpperCase();
@@ -403,7 +466,11 @@ async function sendMessage() {
         const response = await fetch(`${apiUrl}/chat`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ message: text }),
+            body: JSON.stringify({ 
+                message: text,
+                session_id: sessionId,
+                conversation_mode: true
+            }),
             timeout: 30000  // 30 second timeout for Groq API (can be slow)
         });
         
