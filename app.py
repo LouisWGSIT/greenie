@@ -58,6 +58,15 @@ def load_knowledge_seed():
         try:
             knowledge_store = KnowledgeStore(user_id=1)
             
+            # Load warehouse overview
+            if 'warehouse_overview' in seed_data:
+                overview = seed_data['warehouse_overview']
+                knowledge_store.add_knowledge(
+                    name=overview.get('name', 'Berry Hill ITAD Warehouse'),
+                    description=f"Location: {overview.get('location', '')}. Mission: {overview.get('mission', '')}",
+                    keywords=['warehouse', 'overview', 'location', 'mission']
+                )
+            
             # Load workflow items
             if 'workflow' in seed_data:
                 for item in seed_data['workflow']:
@@ -70,19 +79,122 @@ def load_knowledge_seed():
                     except Exception as e:
                         logger.warning(f"Failed to load workflow item {item.get('name')}: {e}")
             
-            # Load device categories
-            if 'device_categories' in seed_data:
-                cats = seed_data['device_categories']
-                if isinstance(cats.get('examples'), list):
-                    for item in cats['examples']:
+            # Load erasure procedures (NEW - CRITICAL FOR DEVICE-SPECIFIC KNOWLEDGE)
+            if 'erasure_procedures' in seed_data:
+                procs = seed_data['erasure_procedures']
+                for device_type, procedure in procs.items():
+                    try:
+                        name = procedure.get('name', device_type)
+                        method = procedure.get('method', '')
+                        process = procedure.get('process', [])
+                        process_text = '\n'.join(process) if isinstance(process, list) else str(process)
+                        
+                        knowledge_store.add_knowledge(
+                            name=f"Erasure: {name}",
+                            description=f"Method: {method}\n\nProcedure:\n{process_text}",
+                            keywords=procedure.get('keywords', []) + [device_type, 'erasure', 'procedure']
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to load erasure procedure {device_type}: {e}")
+            
+            # Load diagnostics and troubleshooting (NEW)
+            if 'diagnostics_and_troubleshooting' in seed_data:
+                diags = seed_data['diagnostics_and_troubleshooting']
+                for issue_key, issue_data in diags.items():
+                    try:
+                        issue_name = issue_data.get('issue', issue_key)
+                        solutions = issue_data.get('solutions', [])
+                        solutions_text = '\n'.join(solutions) if isinstance(solutions, list) else str(solutions)
+                        
+                        knowledge_store.add_knowledge(
+                            name=f"Troubleshooting: {issue_name}",
+                            description=f"Problem: {issue_name}\n\nSolutions:\n{solutions_text}",
+                            keywords=issue_data.get('keywords', []) + ['troubleshooting', 'diagnostic', 'issue']
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to load diagnostic {issue_key}: {e}")
+            
+            # Load general device knowledge (NEW)
+            if 'general_device_knowledge' in seed_data:
+                gen_knowledge = seed_data['general_device_knowledge']
+                
+                # Load BIOS access keys
+                if 'bios_access_keys' in gen_knowledge:
+                    bios_keys = gen_knowledge['bios_access_keys']
+                    description = "BIOS Access Keys by Manufacturer:\n\n"
+                    for mfr, keys in bios_keys.items():
+                        if isinstance(keys, dict) and mfr != 'notes':
+                            description += f"{mfr.upper()}: BIOS={keys.get('bios_entry', 'N/A')}, Boot={keys.get('boot_menu', 'N/A')}\n"
+                    
+                    knowledge_store.add_knowledge(
+                        name="BIOS Access Keys",
+                        description=description,
+                        keywords=['bios', 'keys', 'boot', 'menu', 'access', 'dell', 'hp', 'lenovo', 'acer', 'asus']
+                    )
+                
+                # Load BIOS password recovery
+                if 'bios_password_recovery' in gen_knowledge:
+                    recovery = gen_knowledge['bios_password_recovery']
+                    for recovery_type, details in recovery.items():
                         try:
                             knowledge_store.add_knowledge(
-                                name=f"Device: {item.get('category', '')}",
-                                description=f"Device category with erasure and diagnostic procedures. Erasure: {item.get('erasure_method', 'pending')}. Diagnostics: {item.get('diagnostic_tests', 'pending')}",
-                                keywords=["device", "category", item.get('category', '').lower()]
+                                name=f"BIOS Recovery: {recovery_type}",
+                                description=details.get('description', '') + '\n\nProcess:\n' + '\n'.join(details.get('process', [])),
+                                keywords=details.get('keywords', []) + ['bios', 'password', 'recovery']
                             )
                         except Exception as e:
-                            logger.warning(f"Failed to load device category {item.get('category')}: {e}")
+                            logger.warning(f"Failed to load BIOS recovery {recovery_type}: {e}")
+            
+            # Load QA grading info
+            if 'qa_grading' in seed_data:
+                qa = seed_data['qa_grading']
+                process_text = '\n'.join(qa.get('process', [])) if 'process' in qa else ''
+                knowledge_store.add_knowledge(
+                    name="QA Grading",
+                    description=f"Grading Scale: {qa.get('grading_scale', 'A-D')}\n\nProcess:\n{process_text}",
+                    keywords=['qa', 'grading', 'quality', 'assessment']
+                )
+            
+            # Load quarantine rules
+            if 'quarantine_rules' in seed_data:
+                quar = seed_data['quarantine_rules']
+                triggers = '\n'.join(quar.get('triggers', [])) if 'triggers' in quar else ''
+                process_text = '\n'.join(quar.get('process', [])) if 'process' in quar else ''
+                knowledge_store.add_knowledge(
+                    name="Quarantine Rules",
+                    description=f"Triggers:\n{triggers}\n\nProcess:\n{process_text}",
+                    keywords=['quarantine', 'locked', 'password', 'mdm', 'firmware']
+                )
+            
+            # Load common issues
+            if 'common_issues' in seed_data:
+                issues = seed_data['common_issues']
+                for issue_key, issue_data in issues.items():
+                    try:
+                        issue_name = issue_data.get('issue', issue_key)
+                        resolution = issue_data.get('resolution', issue_data.get('solutions', ''))
+                        knowledge_store.add_knowledge(
+                            name=f"Known Issue: {issue_name}",
+                            description=f"{issue_name}\n\nResolution: {resolution}",
+                            keywords=issue_data.get('keywords', []) + ['issue', 'known-issue']
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to load common issue {issue_key}: {e}")
+            
+            # Load additional resources
+            if 'additional_resources' in seed_data:
+                resources = seed_data['additional_resources']
+                for resource_key, resource_data in resources.items():
+                    try:
+                        location = resource_data.get('location', '')
+                        description = resource_data.get('description', '')
+                        knowledge_store.add_knowledge(
+                            name=f"Resource: {resource_key}",
+                            description=f"Location: {location}\n\nDescription: {description}",
+                            keywords=['resource', resource_key]
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to load resource {resource_key}: {e}")
             
             logger.info("Knowledge seed loaded successfully")
         finally:
