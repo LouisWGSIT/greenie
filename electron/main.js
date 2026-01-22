@@ -51,6 +51,9 @@ function createWindow() {
         if (!isQuitting) {
             event.preventDefault();
             mainWindow.hide();
+        } else {
+            // Backup knowledge before quitting
+            mainWindow.webContents.send('backup-before-quit');
         }
     });
 

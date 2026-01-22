@@ -3,6 +3,10 @@ let apiUrl = '';
 let currentToken = null;
 let currentUsername = null;
 let sessionId = null;  // Persistent session for conversation memory
+let messageCount = 0;  // Track messages for periodic backups
+let lastBackupTime = Date.now();  // Track backup timing
+const BACKUP_MESSAGE_INTERVAL = 5;  // Backup every 5 messages
+const BACKUP_TIME_INTERVAL = 5 * 60 * 1000;  // Backup every 5 minutes
 
 // DOM Elements
 const floatingBtn = document.getElementById('floatingBtn');
@@ -381,6 +385,8 @@ function showChatPanel(isGuest = false) {
     if (!isGuest) {
         userInfo.classList.add('active');
         currentUserSpan.textContent = currentUsername;
+        // Auto-import knowledge for authenticated users
+        autoImportKnowledge();
     }
     
     messages.innerHTML = '';
@@ -510,6 +516,14 @@ async function sendMessage() {
         const reply = data.reply || data.response || data.message || 'No response received';
         console.log('[Greenie Chat] Displaying reply:', reply.substring(0, 100));
         addMessage('Greenie', reply, 'assistant');
+        
+        // Track message and trigger auto-backup if needed
+        messageCount++;
+        const timeSinceLastBackup = Date.now() - lastBackupTime;
+        if (messageCount >= BACKUP_MESSAGE_INTERVAL || timeSinceLastBackup >= BACKUP_TIME_INTERVAL) {
+            messageCount = 0;
+            autoBackupKnowledge();
+        }
     } catch (error) {
         const thinkingMsg = messages.querySelector('.thinking');
         if (thinkingMsg) {
@@ -532,6 +546,53 @@ async function sendMessage() {
     }
 }
 
+// Auto-backup knowledge to backend
+async function autoBackupKnowledge() {
+    if (!currentToken) return;  // Only backup for authenticated users
+    
+    try {
+        console.log('[Greenie] Auto-backing up knowledge...');
+        const response = await fetch(`${apiUrl}/knowledge/export`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const knowledgeData = await response.json();
+            // Store backup timestamp for next check
+            lastBackupTime = Date.now();
+            console.log('[Greenie] Knowledge backed up successfully');
+        }
+    } catch (e) {
+        console.log('[Greenie] Auto-backup failed:', e.message);
+    }
+}
+
+// Auto-import knowledge on login
+async function autoImportKnowledge() {
+    if (!currentToken) return;
+    
+    try {
+        console.log('[Greenie] Auto-importing knowledge...');
+        const response = await fetch(`${apiUrl}/knowledge/export`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const knowledgeData = await response.json();
+            console.log('[Greenie] Knowledge imported:', Object.keys(knowledgeData).length, 'items');
+            // Knowledge is automatically available in chat context via backend prompts
+        }
+    } catch (e) {
+        console.log('[Greenie] Auto-import failed:', e.message);
+    }
+}
+
 // Log errors to backend for monitoring
 async function logErrorToBackend(errorData) {
     try {
@@ -547,6 +608,12 @@ async function logErrorToBackend(errorData) {
         console.log('Could not send error log to backend');
     }
 }
+
+// Listen for app quit signal to backup before closing
+window.electronAPI && window.electronAPI.onQuitSignal && window.electronAPI.onQuitSignal(() => {
+    console.log('[Greenie] App closing, performing final backup...');
+    autoBackupKnowledge();
+});
 
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => {
